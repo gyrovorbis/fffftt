@@ -5,7 +5,7 @@
 [submodule "GLdc"]
 	path = GLdc
 	url = https://gitlab.com/simulant/GLdc.git
-	branch = new-vertex-structure
+	branch = master
 [submodule "sh4zam"]
 	path = sh4zam
 	url = https://github.com/gyrovorbis/sh4zam.git
