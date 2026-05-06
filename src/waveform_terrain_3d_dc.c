@@ -39,7 +39,7 @@ static void build_waveform_terrain_lane_from_cursor(int lane, int cursor);
 static void update_mesh_normals_hilbert(float* normals, const float* src_normals, const float* normal_field, const float* vertices);
 static void build_rms_color_field(int lane);
 static void update_mesh_colors_rms(Color* colors);
-static Color sample_rms_pallete(float rms);
+static Color sample_rms_palette(float rms);
 
 static int inspection_ready = 0;
 static void update_playback_controls_waveform(void);
@@ -47,6 +47,9 @@ static void recompute_waveform_onset(void);
 static void inspection_step(int dir);
 static void rebase_waveform_history(void);
 static void update_waveform_terrain_meshes(void);
+static float adaptive_waveform_onset_power_mean = 0.0f; //TODO: just be clear this is waveform naive onset
+static float adaptive_waveform_onset_power_deviation = 0.0f;
+static int adaptive_waveform_onset_power_ready = 0;
 
 int main(void) {
     // SetTraceLogLevel(LOG_WARNING);
@@ -56,9 +59,7 @@ int main(void) {
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
     load_audio_tracks();
-    // set_audio_track(DEFAULT_AUDIO_TRACK_KREUZSCHMERZEN_RENT_DUE);
-    // set_audio_track(DEFAULT_AUDIO_TRACK_KREUZSCHMERZEN);
-    set_audio_track(DEFAULT_AUDIO_TRACK_SHADERTOY_EXPERIMENT);
+    set_audio_track(SHADERTOY_EXPERIMENT);
     audio_stream = LoadAudioStream(SRC_SAMPLE_RATE, SRC_BIT_DEPTH, SRC_CHANNELS);
     PlayAudioStream(audio_stream);
 
@@ -110,6 +111,7 @@ int main(void) {
             break;
         }
 
+        update_audio_track_cycle();
         update_playback_controls_waveform();
 
         int audio_dirty = 0;
@@ -142,10 +144,13 @@ int main(void) {
         if (audio_dirty) {
             update_waveform_terrain_meshes();
         }
-
-        update_audio_track_cycle();
         update_camera_orbit(&camera, GetFrameTime());
-        update_padmouse(GetFrameTime(), &camera);
+        update_light_camera_strafe(&camera,
+                                   compute_buoy_rest_pos(vertices, LANE_POINT_COUNT, MIDDLE),
+                                   (BoundingBox){
+                                       .min = {-LIGHT_SCENE_X_HALF, -AMPLITUDE_Y_SCALE - 0.25f, -LIGHT_SCENE_Z_HALF},
+                                       .max = {+LIGHT_SCENE_X_HALF, +AMPLITUDE_Y_SCALE + 3.5f, +LIGHT_SCENE_Z_HALF},
+                                   });
         update_diffuse_strength();
 
         BeginDrawing();
@@ -160,10 +165,11 @@ int main(void) {
         glLightModelfv(GL_LIGHT_MODEL_AMBIENT, (const GLfloat[]){0.2f, 0.2f, 0.2f, 1.0f});
         glLightfv(GL_LIGHT0, GL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
         glLightfv(GL_LIGHT0, GL_DIFFUSE, light0_diffuse);
-        glLightfv(GL_LIGHT0, GL_POSITION, (const GLfloat[]){light0_position.x, light0_position.y, light0_position.z, 1.0f});
+        glLightfv(GL_LIGHT0, GL_POSITION, (const GLfloat[]){light0_pos.x, light0_pos.y, light0_pos.z, 1.0f});
         DrawModelEx(model_a, MIDDLE, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
         glDisable(GL_LIGHTING);
-        draw_light_position_marker(light0_position);
+        draw_lantern(light0_pos);
+        draw_lantern_glow(light0_pos);
 
         DrawModelEx(model_b, BOTTOM, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
 
@@ -181,6 +187,7 @@ int main(void) {
         glLightModelfv(GL_LIGHT_MODEL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
         glLightfv(GL_LIGHT0, GL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
         glLightfv(GL_LIGHT0, GL_DIFFUSE, (const GLfloat[]){1.0f, 1.0f, 1.0f, 1.0f});
+        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, (const GLfloat[]){0.0f, 0.0f, 0.0f, 0.0f});
         DrawModelEx(flat_model, TOP, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
         glShadeModel(GL_SMOOTH);
         glDisable(GL_LIGHTING);
@@ -196,7 +203,6 @@ int main(void) {
         EndMode3D();
         DrawTextEx(font, TextFormat("%2i FPS", GetFPS()), (Vector2){50.0f, 440.0f}, FONT_SIZE, 0.0f, WHITE);
         draw_playback_inspection_hud();
-        draw_padmouse();
         EndDrawing();
     }
 
@@ -225,18 +231,13 @@ static void init_hilbert_filter(void) {
     float kaiser_beta_i0 = 1.0f;
     float kaiser_term = 1.0f;
     for (int i = 1; i <= 12; i++) {
-        float series_index = (float)i;
-        kaiser_term *= (kaiser_beta * kaiser_beta) / (4.0f * series_index * series_index);
+        kaiser_term *= (kaiser_beta * kaiser_beta) / (4.0f * (float)(i * i));
         kaiser_beta_i0 += kaiser_term;
     }
 
-    for (int j = -hilbert_filter_radius; j <= hilbert_filter_radius; j++) {
-        if (j == 0 || (j % 2) == 0) {
-            continue;
-        }
-
-        float normalized_filter_position = (float)j / (float)hilbert_filter_radius;
-        float kaiser_argument = kaiser_beta * SQRTF(FMAXF(0.0f, 1.0f - normalized_filter_position * normalized_filter_position));
+    for (int j = 1 - hilbert_filter_radius; j <= hilbert_filter_radius - 1; j += 2) {
+        float normalized_filter_pos = (float)j / (float)hilbert_filter_radius;
+        float kaiser_argument = kaiser_beta * SQRTF(FMAXF(0.0f, 1.0f - normalized_filter_pos * normalized_filter_pos));
         float kaiser_window_i0 = 1.0f;
         float window_term = 1.0f;
         for (int l = 1; l <= 12; l++) {
@@ -257,7 +258,6 @@ static void build_hilbert_normal_field(int lane) {
     //https://www.mathworks.com/help/signal/ref/envelope.html
     // (see all the envelope(,,'analytic') envelopes, the idea is to get the intersection of the envelope and the wavform for ridges...)
     //https://www.mathworks.com/help/signal/ref/hilbert.html
-    // also
     const int hilbert_filter_radius = 65 / 2;
     const float contact_ratio_min = 0.72f;
     const float curvature_min = 0.012f;
@@ -278,19 +278,20 @@ static void build_hilbert_normal_field(int lane) {
         int center_sample_index = hilbert_center_sample_indices[i];
         float hilbert_sample = 0.0f;
 
-        for (int j = -hilbert_filter_radius; j <= hilbert_filter_radius; j++) {
-            float ideal_hilbert = hilbert_filter_ideal[j + hilbert_filter_radius];
-            if (ideal_hilbert == 0.0f) {
-                continue;
-            }
-
+        int j_min = MAXI(-(hilbert_filter_radius - 1), center_sample_index - (ANALYSIS_WINDOW_SIZE_IN_FRAMES - 1));
+        int j_max = MINI(hilbert_filter_radius - 1, center_sample_index);
+        if ((j_min & 1) == 0) {
+            j_min++;
+        }
+        if ((j_max & 1) == 0) {
+            j_max--;
+        }
+        for (int j = j_min; j <= j_max; j += 2) {
             int k = center_sample_index - j;
-            if (k < 0 || k >= ANALYSIS_WINDOW_SIZE_IN_FRAMES) {
-                continue;
-            }
-
+            float ideal_hilbert = hilbert_filter_ideal[j + hilbert_filter_radius];
+            float kaiser_window = hilbert_filter_window[j + hilbert_filter_radius];
             float centered_sample = analysis_window_samples[k] - analysis_mean;
-            hilbert_sample += centered_sample * ideal_hilbert * hilbert_filter_window[j + hilbert_filter_radius];
+            hilbert_sample += centered_sample * ideal_hilbert * kaiser_window;
         }
 
         float waveform_sample = lane_point_values[lane][i];
@@ -300,10 +301,7 @@ static void build_hilbert_normal_field(int lane) {
         float local_lower_envelope_value = analysis_mean - local_analytic_envelope_value;
         float local_envelope_reference_value = (waveform_sample >= analysis_mean) ? local_upper_envelope_value : local_lower_envelope_value;
 
-        float contact_ratio = 0.0f;
-        if (local_analytic_envelope_value > 0.0f) {
-            contact_ratio = 1.0f - (FABSF(waveform_sample - local_envelope_reference_value) / local_analytic_envelope_value);
-        }
+        float contact_ratio = 1.0f - (FABSF(waveform_sample - local_envelope_reference_value) / local_analytic_envelope_value);
         contact_ratio = CLAMP((contact_ratio - contact_ratio_min) / (1.0f - contact_ratio_min), 0.0f, 1.0f);
         contact_ratio = contact_ratio * contact_ratio * (3.0f - 2.0f * contact_ratio);
 
@@ -361,12 +359,12 @@ static void update_mesh_normals_hilbert(float* normals, const float* src_normals
             };
             waveform_normal = Vector3Normalize(waveform_normal);
 
-            Vector3 vertex_position = {
+            Vector3 vertex_pos = {
                 vertices[k + 0],
                 vertices[k + 1],
                 vertices[k + 2],
             };
-            Vector3 light_direction = Vector3Normalize(Vector3Subtract(light0_position, vertex_position));
+            Vector3 light_direction = Vector3Normalize(Vector3Subtract(light0_pos, vertex_pos));
 
             if (Vector3DotProduct(waveform_normal, light_direction) < 0.0f) {
                 waveform_normal = Vector3Negate(waveform_normal);
@@ -375,21 +373,6 @@ static void update_mesh_normals_hilbert(float* normals, const float* src_normals
             float light_component = Vector3DotProduct(waveform_normal, light_direction);
             Vector3 cancel_normal = Vector3Subtract(waveform_normal, Vector3Scale(light_direction, light_component));
             cancel_normal = Vector3Normalize(cancel_normal);
-
-            if (contact_mask_value <= 0.0f) {
-                normals[k + 0] = cancel_normal.x;
-                normals[k + 1] = cancel_normal.y;
-                normals[k + 2] = cancel_normal.z;
-                continue;
-            }
-
-            if (contact_mask_value >= 1.0f) {
-                normals[k + 0] = waveform_normal.x;
-                normals[k + 1] = waveform_normal.y;
-                normals[k + 2] = waveform_normal.z;
-                continue;
-            }
-
             contact_mask_value = POWF(contact_mask_value, 0.35f);
 
             Vector3 final_normal = Vector3Normalize(Vector3Lerp(cancel_normal, waveform_normal, contact_mask_value));
@@ -415,19 +398,19 @@ static void build_rms_color_field(int lane) {
 }
 
 static void update_mesh_colors_rms(Color* colors) {
+    MEMSET(colors, 0, sizeof(Color) * MESH_VERTEX_COUNT);
     for (int i = 0; i < LANE_COUNT; i++) {
         for (int j = 0; j < LANE_POINT_COUNT; j++) {
-            int k = i * LANE_POINT_COUNT + j;
-            colors[k] = sample_rms_pallete(rms_color_field[i][j]);
+            float rms = rms_color_field[i][j];
+            colors[i * LANE_POINT_COUNT + j] = sample_rms_palette(rms);
         }
     }
 }
 
-static Color sample_rms_pallete(float rms) {
-    const float visibility_threshold = 0.2f;
-    float t = (rms - visibility_threshold) / (1.0f - visibility_threshold);
+static Color sample_rms_palette(float rms) {
+    float t = (rms - 0.2f) / (1.0f - 0.2f);
     if (t <= 0.0f) {
-        return (Color){0, 0, 0, 0}; //TODO: figure out a way to group colors, wavefomr is too sparse, fft will work better of course...
+        return BLANK;
     }
 
     t = CLAMP(t, 0.0f, 1.0f);
@@ -469,25 +452,42 @@ static void recompute_waveform_onset(void) {
     // raw waveform signal derived onset  LIMITATIONS!!!:
     // https://www.iro.umontreal.ca/~pift6080/H09/documents/papers/bello_onset_tutorial.pdf
     // https://mural.maynoothuniversity.ie/id/eprint/4204/1/JT_Real-Time_Detection.pdf
-    onset_interpolation_factor = 0.0f;
+    float onset_delta_power = 0.0f;
 
-    for (int i = LANE_COUNT - 2; i >= 0; i--) {
-        float onset_strength = 0.0f;
-        for (int j = 0; j < LANE_POINT_COUNT; j++) {
-            float row_delta = lane_point_values[i][j] - lane_point_values[i + 1][j];
-            onset_strength += row_delta * row_delta;
-        }
-        onset_strength /= (float)LANE_POINT_COUNT;
-
-        float onset_strength_normalized = CLAMP((onset_strength - ONSET_STRENGTH_MIN) / (ONSET_STRENGTH_MAX - ONSET_STRENGTH_MIN), 0.0f, 1.0f);
-        float onset_rate = ONSET_DECAY_RATE;
-        if (onset_strength_normalized > onset_interpolation_factor) {
-            onset_rate = ONSET_ATTACK_RATE;
-        }
-
-        onset_interpolation_factor = LERP(onset_interpolation_factor, onset_strength_normalized, onset_rate);
-        onset_interpolation_factor = CLAMP(onset_interpolation_factor, 0.0f, 1.0f);
+    for (int j = 0; j < LANE_POINT_COUNT; j++) {
+        float lane_delta = FMAXF(FABSF(lane_point_values[0][j]) - FABSF(lane_point_values[1][j]), 0.0f);
+        onset_delta_power += lane_delta * lane_delta;
     }
+    onset_delta_power /= (float)LANE_POINT_COUNT;
+
+    if (!adaptive_waveform_onset_power_ready) {
+        adaptive_waveform_onset_power_mean = onset_delta_power;
+        adaptive_waveform_onset_power_deviation = onset_delta_power;
+        adaptive_waveform_onset_power_ready = 1;
+    } else {
+        float adaptive_waveform_onset_power_delta = FABSF(onset_delta_power - adaptive_waveform_onset_power_mean);
+        adaptive_waveform_onset_power_mean = LERP(adaptive_waveform_onset_power_mean, onset_delta_power, GLOBAL_ADAPTIVE_GATE_SMOOTHING_FACTOR);
+        adaptive_waveform_onset_power_deviation =
+            LERP(adaptive_waveform_onset_power_deviation, adaptive_waveform_onset_power_delta, GLOBAL_ADAPTIVE_GATE_SMOOTHING_FACTOR);
+    }
+
+    float adaptive_waveform_onset_power_floor =
+        adaptive_waveform_onset_power_mean - adaptive_waveform_onset_power_deviation * GLOBAL_ADAPTIVE_GATE_FLOOR_DEVIATION_SCALE;
+    float adaptive_waveform_onset_power_ceiling =
+        adaptive_waveform_onset_power_mean + adaptive_waveform_onset_power_deviation * GLOBAL_ADAPTIVE_GATE_CEILING_DEVIATION_SCALE;
+    float onset_gate_target = 0.0f;
+    if (adaptive_waveform_onset_power_ceiling > adaptive_waveform_onset_power_floor) {
+        onset_gate_target =
+            CLAMP((onset_delta_power - adaptive_waveform_onset_power_floor) / (adaptive_waveform_onset_power_ceiling - adaptive_waveform_onset_power_floor),
+                  0.0f,
+                  1.0f);
+    }
+    if (onset_gate_target > onset_gate) {
+        onset_gate = onset_gate_target;
+    } else {
+        onset_gate = LERP(onset_gate, onset_gate_target, ONSET_DECAY_RATE);
+    }
+    onset_gate = CLAMP(onset_gate, 0.0f, 1.0f);
 }
 
 static void inspection_step(int dir) {
@@ -509,7 +509,10 @@ static void rebase_waveform_history(void) {
     MEMSET(lane_point_values, 0, sizeof(lane_point_values));
     MEMSET(hilbert_normal_field, 0, sizeof(hilbert_normal_field));
     MEMSET(rms_color_field, 0, sizeof(rms_color_field));
-    onset_interpolation_factor = 0.0f;
+    onset_gate = 0.0f;
+    adaptive_waveform_onset_power_mean = 0.0f;
+    adaptive_waveform_onset_power_deviation = 0.0f;
+    adaptive_waveform_onset_power_ready = 0;
 
     for (int i = 0; i < LANE_COUNT; i++) {
         int lane_cursor = (wave_cursor + wave.frameCount - ((i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount)) % wave.frameCount;
@@ -521,7 +524,7 @@ static void rebase_waveform_history(void) {
 }
 
 static void update_waveform_terrain_meshes(void) {
-    update_mesh_vertices(vertices, &lane_point_values[0][0], LANE_POINT_COUNT);
+    update_mesh_vertices(vertices, &lane_point_values[0][0], LANE_POINT_COUNT, AMPLITUDE_Y_SCALE);
     update_mesh_normals_smooth(normals, vertices, LANE_POINT_COUNT);
     update_mesh_normals_hilbert(hilbert_normals, normals, &hilbert_normal_field[0][0], vertices);
     update_mesh_colors_rms(rms_colors);
@@ -537,6 +540,10 @@ static void update_waveform_terrain_meshes(void) {
     // build_mesh_smooth(&mesh_b, vertices, normals, colors);
     build_mesh_smooth(&mesh_b, vertices, normals, rms_colors, mesh_b.texcoords, MESH_VERTEX_COUNT);
 
+    //TODO: ugly hack to get occasional transparency on top layer without inventing a whole new color field...
+    for (int i = 0; i < FLAT_VERTEX_COUNT; i++) {
+        flat_colors[i] = ((&hilbert_normal_field[0][0])[mesh_a.indices[i]] <= 0.2f) ? BLANK : colors[mesh_a.indices[i]];
+    }
     // build_mesh_flat(&flat_mesh, flat_vertices, flat_normals, flat_colors, FLAT_VERTEX_COUNT);
     // build_mesh_flat(&flat_mesh, flat_vertices, flat_hilbert_normals, flat_colors, FLAT_VERTEX_COUNT);
     build_mesh_flat(&flat_mesh, flat_vertices, flat_hilbert_normals, flat_colors, FLAT_VERTEX_COUNT);

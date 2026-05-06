@@ -33,6 +33,9 @@
 #define MEMCPY4(dst, src, size) shz_memcpy4((dst), (src), (size))
 #define CLAMP(x, min, max) shz_clampf((x), (min), (max))
 #define LERP(a, b, t) shz_lerpf((a), (b), (t))
+#define MAXI(x, y) ((x) > (y) ? (x) : (y))
+#define MINI(x, y) ((x) < (y) ? (x) : (y))
+#define WRAP_HISTORY(frame) (((frame) + ANALYSIS_FFT_HISTORY_FRAME_COUNT) % ANALYSIS_FFT_HISTORY_FRAME_COUNT)
 
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
@@ -56,7 +59,7 @@
 #define YU_XUAN2_QING1 CLITERAL(Color){61, 59, 79, 255}           // #3D3B4F
 #define YU_MU4_LAN2_ZI3 CLITERAL(Color){128, 109, 158, 255}       // #806D9E
 #define RETURN_HU3_PO4 CLITERAL(Color){202, 105, 36, 255}         // #CA6924
-#define WUXING_PITCH_CLASS_LUT                                                                                                                                 \
+#define WUXING_CHROMA_LUT                                                                                                                                      \
     {GONG_GAO3_HUANG2,                                                                                                                                         \
      GONG_JIN1_HUANG2,                                                                                                                                         \
      SHANG_XIANG4_YA2_BAI2,                                                                                                                                    \
@@ -98,7 +101,7 @@
 #define RD_KREUZSCHMERZEN_RENT_DUE_22K_WAV "/rd/kreuzschmerzen_rent_due_22050hz_pcm16_mono.wav"
 
 #define RD_SHADERTOY_EXPERIMENT_22K_WAV "/rd/shadertoy_experiment_22050hz_pcm16_mono.wav"
-#define RD_SHADERTOY_ELECTRONEBULAE_ONE_FOURTH_22K_WAV "/rd/shadertoy_electronebulae_22050hz_pcm16_mono.wav"
+#define RD_SHADERTOY_ELECTRONEBULAE_22K_WAV "/rd/shadertoy_electronebulae_22050hz_pcm16_mono.wav"
 #define RD_SHADERTOY_8BIT_22K_WAV "/rd/shadertoy_8bit_22050hz_pcm16_mono.wav"
 #define RD_SHADERTOY_GEOMETRIC_PERSON_22K_WAV "/rd/shadertoy_geometric_person_22050hz_pcm16_mono.wav"
 #define RD_SHADERTOY_TROPICAL_22K_WAV "/rd/shadertoy_tropical_22050hz_pcm16_mono.wav"
@@ -116,9 +119,6 @@
 #define RD_AT_UNTITLED_22K_WAV "/rd/at_untitled_22050hz_pcm16_mono.wav"
 #define RD_AT_UNTITLED_FULL_22K_WAV "/rd/at_untitled_full_22050hz_pcm16_mono.wav"
 
-#define RD_RAMA_22K_WAV "/rd/rama_22050hz_pcm16_mono.wav"
-#define RD_RAMA_FULL_22K_WAV "/rd/rama_full_22050hz_pcm16_mono.wav"
-
 #define RD_TJ_SAYO_22K_WAV "/rd/tj_sayo_22050hz_pcm16_mono.wav"
 #define RD_TJ_SAYO_FULL_22K_WAV "/rd/tj_sayo_full_22050hz_pcm16_mono.wav"
 
@@ -132,11 +132,11 @@ typedef struct FFTComplex {
 
 typedef struct FFTData {
     FFTComplex* work_buffer;
-    float* prev_spectrum_bin_levels;
-    unsigned int frame_index;
-    float (*raw_spectrum_history_levels)[ANALYSIS_SPECTRUM_BIN_COUNT];
-    float (*spectrum_history_levels)[ANALYSIS_SPECTRUM_BIN_COUNT];
-    int history_pos;
+    float* smoothed_spectrum_magnitudes;
+    unsigned int frame_pos;
+    float (*raw_spectrum_magnitudes)[ANALYSIS_SPECTRUM_BIN_COUNT];
+    float (*spectrum_levels)[ANALYSIS_SPECTRUM_BIN_COUNT];
+    int history_frame_pos;
     float tapback_pos;
 } FFTData;
 
@@ -155,7 +155,7 @@ typedef struct FFTData {
     } while (0)
 
 typedef struct FFTProfileData {
-    int last_log_sec;
+    int prev_log_sec;
     int run_count;
     float dur_sum_ms;
     float dur_min_ms;
@@ -188,7 +188,7 @@ typedef struct FFTProfileData {
         }                                                                                                                                                      \
                                                                                                                                                                \
         int fftprof_elapsed_sec = (int)fftprof_elapsed_s;                                                                                                      \
-        if (fftprof_elapsed_sec != fftprof_profile->last_log_sec) {                                                                                            \
+        if (fftprof_elapsed_sec != fftprof_profile->prev_log_sec) {                                                                                            \
             if (fftprof_domain != NULL && fftprof_fft_data != NULL) {                                                                                          \
                 char fftprof_timestamp[LOG_TIMESTAMP_SIZE];                                                                                                    \
                 int fftprof_elapsed_ms = (int)(fftprof_elapsed_s * (float)MILLISECONDS_PER_SECOND);                                                            \
@@ -196,18 +196,18 @@ typedef struct FFTProfileData {
                                                                                                                                                                \
                 FORMAT_MMSSMMM(fftprof_timestamp, fftprof_elapsed_ms);                                                                                         \
                 TraceLog(LOG_INFO,                                                                                                                             \
-                         "[%s] [%s] frame=%u; fft_run_count=%d; fft_run_dur_min_ms=%.3f; "                                                                     \
+                         "[%s] [%s] frame_pos=%u; fft_run_count=%d; fft_run_dur_min_ms=%.3f; "                                                                 \
                          "fft_run_dur_max_ms=%.3f; fft_run_dur_avg_ms=%.3f",                                                                                   \
                          fftprof_timestamp,                                                                                                                    \
                          fftprof_domain,                                                                                                                       \
-                         fftprof_fft_data->frame_index,                                                                                                        \
+                         fftprof_fft_data->frame_pos,                                                                                                          \
                          fftprof_profile->run_count,                                                                                                           \
                          fftprof_profile->dur_min_ms,                                                                                                          \
                          fftprof_profile->dur_max_ms,                                                                                                          \
                          fftprof_avg_ms);                                                                                                                      \
             }                                                                                                                                                  \
                                                                                                                                                                \
-            fftprof_profile->last_log_sec = fftprof_elapsed_sec;                                                                                               \
+            fftprof_profile->prev_log_sec = fftprof_elapsed_sec;                                                                                               \
             fftprof_profile->run_count = 0;                                                                                                                    \
             fftprof_profile->dur_sum_ms = 0.0f;                                                                                                                \
         }                                                                                                                                                      \
@@ -253,7 +253,6 @@ static bool is_paused = false;
 #define LN_10 2.302585092994046f
 #define ANALYSIS_DB_TO_LINEAR_SCALE (20.0f / LN_10)
 #define ANALYSIS_SMOOTHING_TIME_CONSTANT 0.8f
-#define ANALYSIS_MIN_LOG_MAGNITUDE 1e-40f
 
 #define ANALYSIS_FFT_HISTORICAL_SMOOTHING_DUR 2000
 #define ANALYSIS_WINDOW_DURATION_MS ((ANALYSIS_WINDOW_SIZE_IN_FRAMES * MILLISECONDS_PER_SECOND) / ANALYSIS_SAMPLE_RATE)
@@ -272,32 +271,30 @@ static inline void apply_blackman_window(void) {
     }
 }
 
-static inline void update_spectrum_bin(float* smoothed_spectrum, int bin, float real, float imaginary) {
+static inline void update_smoothing_and_spectrum_levels_bin(float* spectrum_levels, int bin, float real, float imaginary) {
     float linear_magnitude = SQRTF(real * real + imaginary * imaginary) / ANALYSIS_WINDOW_SIZE_IN_FRAMES;
     float smoothed_magnitude =
-        ANALYSIS_SMOOTHING_TIME_CONSTANT * fft_data.prev_spectrum_bin_levels[bin] + (1.0f - ANALYSIS_SMOOTHING_TIME_CONSTANT) * linear_magnitude;
-    float db = LOGF(FMAXF(smoothed_magnitude, ANALYSIS_MIN_LOG_MAGNITUDE)) * ANALYSIS_DB_TO_LINEAR_SCALE;
-    float normalized = (db - ANALYSIS_MIN_DECIBELS) * ANALYSIS_INVERSE_DECIBEL_RANGE;
-    float clamped_magnitude = CLAMP(normalized, 0.0f, 1.0f);
-
-    fft_data.prev_spectrum_bin_levels[bin] = smoothed_magnitude;
-    smoothed_spectrum[bin] = clamped_magnitude;
+        ANALYSIS_SMOOTHING_TIME_CONSTANT * fft_data.smoothed_spectrum_magnitudes[bin] + (1.0f - ANALYSIS_SMOOTHING_TIME_CONSTANT) * linear_magnitude;
+    fft_data.smoothed_spectrum_magnitudes[bin] = smoothed_magnitude;
+    float db = LOGF(smoothed_magnitude) * ANALYSIS_DB_TO_LINEAR_SCALE;
+    float level = CLAMP((db - ANALYSIS_MIN_DECIBELS) * ANALYSIS_INVERSE_DECIBEL_RANGE, 0.0f, 1.0f);
+    spectrum_levels[bin] = level;
 }
 
 static inline void build_spectrum(void) {
-    float* smoothed_spectrum = fft_data.spectrum_history_levels[fft_data.history_pos];
-    float* raw_spectrum = fft_data.raw_spectrum_history_levels[fft_data.history_pos];
+    float* spectrum_levels = fft_data.spectrum_levels[fft_data.history_frame_pos];
+    float* raw_spectrum_magnitudes = fft_data.raw_spectrum_magnitudes[fft_data.history_frame_pos];
 
-    for (int bin = 0; bin < ANALYSIS_SPECTRUM_BIN_COUNT; bin++) {
-        float re = fft_data.work_buffer[bin].real;
-        float im = fft_data.work_buffer[bin].imaginary;
-        float linear_magnitude = SQRTF(re * re + im * im) / ANALYSIS_WINDOW_SIZE_IN_FRAMES;
-        raw_spectrum[bin] = linear_magnitude;
-        update_spectrum_bin(smoothed_spectrum, bin, re, im);
+    for (int i = 0; i < ANALYSIS_SPECTRUM_BIN_COUNT; i++) {
+        float re = fft_data.work_buffer[i].real;
+        float im = fft_data.work_buffer[i].imaginary;
+        float magnitude = SQRTF(re * re + im * im) / ANALYSIS_WINDOW_SIZE_IN_FRAMES;
+        raw_spectrum_magnitudes[i] = magnitude;
+        update_smoothing_and_spectrum_levels_bin(spectrum_levels, i, re, im);
     }
 
-    fft_data.history_pos = (fft_data.history_pos + 1) % ANALYSIS_FFT_HISTORY_FRAME_COUNT;
-    fft_data.frame_index++;
+    fft_data.history_frame_pos = WRAP_HISTORY(fft_data.history_frame_pos + 1);
+    fft_data.frame_pos++;
 }
 
 // ENVELOPE AND TERRIAN PROFILES + CONSTANTS
@@ -345,7 +342,6 @@ static inline void build_spectrum(void) {
 #define TOP (Vector3){0.0f, 2.0f, 0.0f}
 #define MIDDLE (Vector3){0.0f}
 #define BOTTOM (Vector3){0.0f, -1.0f, 0.0f}
-#define BOTTOM_BASS (Vector3){0.0f, -3.0f, 0.0f}
 
 static float lane_point_values[LANE_COUNT][LANE_POINT_COUNT] = {0};
 
@@ -430,13 +426,13 @@ static inline void fill_mesh_colors(Color* colors, int point_count) {
     }
 }
 
-static inline void update_mesh_vertices(float* vertices, const float* lane_point_values, int point_count) {
+static inline void update_mesh_vertices(float* vertices, const float* lane_point_values, int point_count, float y_scale) {
     for (int i = 0; i < LANE_COUNT; i++) {
         float lane_offset = ((float)i - 0.5f * (float)(LANE_COUNT - 1)) * LANE_SPACING_SCALE;
         for (int j = 0; j < point_count; j++) {
             int k = (i * point_count + j) * 3;
             float x = (((float)j / (float)(point_count - 1)) - HALF_SPAN) * LINE_LENGTH_SCALE;
-            float y = lane_point_values[i * point_count + j] * AMPLITUDE_Y_SCALE;
+            float y = lane_point_values[i * point_count + j] * y_scale;
             vertices[k + 0] = x;
             vertices[k + 1] = y;
             vertices[k + 2] = lane_offset; // NOTE: +Z orientation determined by raylib GenMeshPlane function!!
@@ -473,9 +469,8 @@ static void update_mesh_normals_smooth(float* normals, const float* vertices, in
     }
 }
 
-static inline void update_mesh_texcoords_smooth_scroll(int w, int h, float* texcoords, int point_count, int texels_per_quad, float time) {
-    const Vector2 scroll_direction = {1.0f, 0.25f}; //TODO: make this configurable and cleaner
-    const float scroll_speed = 0.025f;
+static inline void update_mesh_texcoords_smooth_scroll(
+    int w, int h, float* texcoords, int point_count, int texels_per_quad, Vector2 scroll_direction, float scroll_speed, float time) {
     float scroll_s = FMODF(scroll_direction.x * scroll_speed * time, 1.0f);
     float scroll_t = FMODF(scroll_direction.y * scroll_speed * time, 1.0f);
     for (int i = 0; i < LANE_COUNT; i++) {
@@ -642,106 +637,287 @@ static Texture2D build_lane_mask_glow(float* texcoords, int point_count) {
     return texture;
 }
 
-#define ONSET_STRENGTH_MIN 0.0f
-#define ONSET_STRENGTH_MAX 0.025f
-#define ONSET_ATTACK_RATE 0.95f
-#define ONSET_DECAY_RATE 0.10f
-#define ONSET_LAG_FRAMES 1
+#define ADAPTIVE_ONSET_RATE 0.020f
+#define ADAPTIVE_ONSET_GATE_DEVIATION_SCALE 0.75f
+#define ADAPTIVE_ONSET_RANGE_DEVIATION_SCALE 3.00f
+#define GLOBAL_ADAPTIVE_GATE_SMOOTHING_FACTOR 0.08f
+#define GLOBAL_ADAPTIVE_GATE_FLOOR_DEVIATION_SCALE 0.75f
+#define GLOBAL_ADAPTIVE_GATE_CEILING_DEVIATION_SCALE 1.25f
+#define ONSET_DECAY_RATE 0.35f // 0.10f
+#define ONSET_DELAY_FRAMES 1
 #define ONSET_ENVELOPE_RADIUS 2
-#define LIGHT0_DIFFUSE_MIN 0.0f
 #define LIGHT0_DIFFUSE_MAX 1.5f
-#define LIGHT0_MARKER_RADIUS 0.5f
-#define LIGHT0_MARKER_RING_COUNT 3
-#define LIGHT0_MARKER_SEGMENTS 16
 
-static float onset_interpolation_factor = 0.0f;
-static float onset_interpolation_factor_history[ANALYSIS_FFT_HISTORY_FRAME_COUNT] = {0};
-static float light0_diffuse[4] = {LIGHT0_DIFFUSE_MIN, LIGHT0_DIFFUSE_MIN, LIGHT0_DIFFUSE_MIN, 1.0f};
-static bool padmouse_light0_hovered = false;
-static bool padmouse_light0_grabbed = false;
-static Vector3 light0_position = {1.330f, 1.345f, -1.418f};
+static float onset_gate = 0.0f;
+static float onset_gate_history[ANALYSIS_FFT_HISTORY_FRAME_COUNT] = {0};
+static float adaptive_onset_mean = 0.0f;
+static float adaptive_onset_deviation = 0.0f;
+static float adaptive_chroma_mask_mean = 0.0f;
+static float adaptive_chroma_mask_deviation = 0.0f;
+static int adaptive_chroma_mask_ready = 0;
+static float light0_diffuse[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+static Vector3 light0_pos = {1.330f, 1.345f, -1.418f};
 
-static void update_onset_interpolation_factor_fft(FFTData* fft_data) {
+static inline void reset_shared_adaptive_audio_state(void) {
+    MEMSET(onset_gate_history, 0, sizeof(onset_gate_history));
+    onset_gate = 0.0f;
+    adaptive_onset_mean = 0.0f;
+    adaptive_onset_deviation = 0.0f;
+    adaptive_chroma_mask_mean = 0.0f;
+    adaptive_chroma_mask_deviation = 0.0f;
+    adaptive_chroma_mask_ready = 0;
+}
+
+static inline void rebase_fft_spectrum_history_at_wave_cursor(void) {
+    MEMSET(fft_data.smoothed_spectrum_magnitudes, 0, sizeof(float) * ANALYSIS_SPECTRUM_BIN_COUNT);
+    MEMSET(fft_data.raw_spectrum_magnitudes, 0, sizeof(float[ANALYSIS_SPECTRUM_BIN_COUNT]) * ANALYSIS_FFT_HISTORY_FRAME_COUNT);
+    MEMSET(fft_data.spectrum_levels, 0, sizeof(float[ANALYSIS_SPECTRUM_BIN_COUNT]) * ANALYSIS_FFT_HISTORY_FRAME_COUNT);
+    fft_data.history_frame_pos = 0;
+    fft_data.frame_pos = 0;
+    reset_shared_adaptive_audio_state();
+
+    for (int i = ANALYSIS_FFT_HISTORY_FRAME_COUNT - 1; i >= 0; i--) {
+        int replay_frame_offset = (i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+        int chunk_start_frame = (wave_cursor + wave.frameCount - replay_frame_offset) % wave.frameCount;
+
+        for (int j = 0; j < ANALYSIS_WINDOW_SIZE_IN_FRAMES; j++) {
+            int src = (chunk_start_frame + j) % wave.frameCount;
+            analysis_window_samples[j] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
+        }
+
+        apply_blackman_window();
+        shz_fft((shz_complex_t*)fft_data.work_buffer, (size_t)ANALYSIS_WINDOW_SIZE_IN_FRAMES);
+        build_spectrum();
+    }
+}
+
+static void update_onset_gate_fft(FFTData* fft_data, int use_raw) {
     // librosa onset_strength convention:
     // https://librosa.org/doc/main/generated/librosa.onset.onset_strength.html
     // TODO: onset_detect would be a later peak-pick stage is more complicated...
     // https://librosa.org/doc/main/generated/librosa.onset.onset_detect.html
-    int current_index = (fft_data->history_pos - 1 + ANALYSIS_FFT_HISTORY_FRAME_COUNT) % ANALYSIS_FFT_HISTORY_FRAME_COUNT;
-    if (fft_data->frame_index <= ONSET_LAG_FRAMES) {
-        onset_interpolation_factor_history[current_index] = onset_interpolation_factor;
+    int cur_history_frame_pos = WRAP_HISTORY(fft_data->history_frame_pos - 1);
+    if (fft_data->frame_pos <= ONSET_DELAY_FRAMES) {
+        onset_gate_history[cur_history_frame_pos] = onset_gate;
         return;
     }
-
-    int lag_index = (fft_data->history_pos - 1 - ONSET_LAG_FRAMES + ANALYSIS_FFT_HISTORY_FRAME_COUNT) % ANALYSIS_FFT_HISTORY_FRAME_COUNT;
-    float* spectrum = fft_data->spectrum_history_levels[current_index];
-    float* lag_spectrum = fft_data->spectrum_history_levels[lag_index];
+    int delay_history_frame_pos = WRAP_HISTORY(fft_data->history_frame_pos - 1 - ONSET_DELAY_FRAMES);
+    float* spectrum_levels = fft_data->spectrum_levels[cur_history_frame_pos];
+    float* delay_spectrum_levels = fft_data->spectrum_levels[delay_history_frame_pos];
+    float* raw_spectrum_magnitudes = fft_data->raw_spectrum_magnitudes[cur_history_frame_pos];
+    float* delay_raw_spectrum_magnitudes = fft_data->raw_spectrum_magnitudes[delay_history_frame_pos];
     float flux_sum = 0.0f;
     for (int i = 0; i < ANALYSIS_SPECTRUM_BIN_COUNT; i++) {
-        float ref = lag_spectrum[i];
-        for (int j = -ONSET_ENVELOPE_RADIUS; j <= ONSET_ENVELOPE_RADIUS; j++) {
-            int k = i + j;
-            if (k < 0 || k >= ANALYSIS_SPECTRUM_BIN_COUNT) {
-                continue;
+        float cur = spectrum_levels[i];
+        float ref = delay_spectrum_levels[i];
+        if (use_raw) {
+            cur = LOGF(raw_spectrum_magnitudes[i]) * ANALYSIS_DB_TO_LINEAR_SCALE;
+            ref = LOGF(delay_raw_spectrum_magnitudes[i]) * ANALYSIS_DB_TO_LINEAR_SCALE;
+        }
+        int j_min = MAXI(i - ONSET_ENVELOPE_RADIUS, 0);
+        int j_max = MINI(i + ONSET_ENVELOPE_RADIUS, ANALYSIS_SPECTRUM_BIN_COUNT - 1);
+        for (int j = j_min; j <= j_max; j++) {
+            float ref_candidate = delay_spectrum_levels[j];
+            if (use_raw) {
+                ref_candidate = LOGF(delay_raw_spectrum_magnitudes[j]) * ANALYSIS_DB_TO_LINEAR_SCALE;
             }
-            ref = FMAXF(ref, lag_spectrum[k]);
+            ref = FMAXF(ref, ref_candidate);
         }
-        float flux = spectrum[i] - ref;
-        if (flux > 0.0f) {
-            flux_sum += flux;
-        }
+        flux_sum += FMAXF(cur - ref, 0.0f); // librosa onset_strength: max(0, S[f, t] - ref[f, t - lag])
     }
-    float onset_strength = flux_sum / (float)ANALYSIS_SPECTRUM_BIN_COUNT;
-    float onset_strength_normalized = CLAMP((onset_strength - ONSET_STRENGTH_MIN) / (ONSET_STRENGTH_MAX - ONSET_STRENGTH_MIN), 0.0f, 1.0f);
-    float onset_rate = ONSET_DECAY_RATE;
-    if (onset_strength_normalized > onset_interpolation_factor) {
-        onset_rate = ONSET_ATTACK_RATE;
+    float onset_flux = flux_sum / (float)ANALYSIS_SPECTRUM_BIN_COUNT;
+    float adaptive_onset_delta = FABSF(onset_flux - adaptive_onset_mean);
+    adaptive_onset_mean = LERP(adaptive_onset_mean, onset_flux, ADAPTIVE_ONSET_RATE);
+    adaptive_onset_deviation = LERP(adaptive_onset_deviation, adaptive_onset_delta, ADAPTIVE_ONSET_RATE);
+    float adaptive_onset_floor = adaptive_onset_mean + adaptive_onset_deviation * ADAPTIVE_ONSET_GATE_DEVIATION_SCALE;
+    float adaptive_onset_range = adaptive_onset_deviation * ADAPTIVE_ONSET_RANGE_DEVIATION_SCALE;
+    float onset_gate_target = CLAMP((onset_flux - adaptive_onset_floor) / adaptive_onset_range, 0.0f, 1.0f);
+    if (onset_gate_target > onset_gate) {
+        onset_gate = onset_gate_target;
+    } else {
+        onset_gate = LERP(onset_gate, onset_gate_target, ONSET_DECAY_RATE);
     }
-    onset_interpolation_factor = LERP(onset_interpolation_factor, onset_strength_normalized, onset_rate);
-    onset_interpolation_factor = CLAMP(onset_interpolation_factor, 0.0f, 1.0f);
-    onset_interpolation_factor_history[current_index] = onset_interpolation_factor;
+    onset_gate = CLAMP(onset_gate, 0.0f, 1.0f);
+    onset_gate_history[cur_history_frame_pos] = onset_gate;
 }
 
 static void update_diffuse_strength(void) {
-    float light0_diffuse_strength = LERP(LIGHT0_DIFFUSE_MIN, LIGHT0_DIFFUSE_MAX, onset_interpolation_factor);
+    float light0_diffuse_strength = LIGHT0_DIFFUSE_MAX * onset_gate;
     light0_diffuse[0] = light0_diffuse_strength;
     light0_diffuse[1] = light0_diffuse_strength;
     light0_diffuse[2] = light0_diffuse_strength;
     light0_diffuse[3] = 1.0f;
 }
 
-static inline void draw_light_position_marker(Vector3 position) {
-    Color marker_color = SUNFLOWER;
-    if (padmouse_light0_grabbed) {
-        marker_color = NEON_CARROT;
-    } else if (padmouse_light0_hovered) {
-        marker_color = MARINER;
+#define LIGHT_STRAFE_DEADZONE 0.20f
+#define LIGHT_STRAFE_RANGE 2.5f
+#define LIGHT_STRAFE_RESPONSE 8.0f
+#define LIGHT_REST_BOB_AMP 0.50f
+#define LIGHT_SCENE_X_HALF (HALF_SPAN * LINE_LENGTH_SCALE)
+#define LIGHT_SCENE_Z_HALF (0.5f * (float)(LANE_COUNT - 1) * LANE_SPACING_SCALE)
+
+static inline Vector3 compute_buoy_rest_pos(const float* vertices, int point_count, Vector3 anchor_pos) {
+    static float cur_surface_y = 0.0f;
+    static float prev_surface_y = 0.0f;
+    static float rest_bob_y = LIGHT_REST_BOB_AMP;
+    static float rest_bob_vel = 0.0f;
+    static int is_ready = 0;
+    const int center_lane = LANE_COUNT / 2;
+    const int center_point[2] = {(point_count - 1) / 2, point_count / 2};
+    const int center_vertex_offset[2] = {
+        (center_lane * point_count + center_point[0]) * 3,
+        (center_lane * point_count + center_point[1]) * 3,
+    };
+    const float surface_follow_rate = 3.75f;
+    const float surface_impulse_gain = 3.25f;
+    const float bob_stiffness = 18.0f;
+    const float bob_friction = 7.25f;
+    const float bob_ceiling = 0.30f;
+    Vector3 center_surface_pos =
+        Vector3Lerp((Vector3){vertices[center_vertex_offset[0] + 0], vertices[center_vertex_offset[0] + 1], vertices[center_vertex_offset[0] + 2]},
+                    (Vector3){vertices[center_vertex_offset[1] + 0], vertices[center_vertex_offset[1] + 1], vertices[center_vertex_offset[1] + 2]},
+                    0.5f);
+    if (!is_ready) {
+        cur_surface_y = center_surface_pos.y;
+        prev_surface_y = center_surface_pos.y;
+        rest_bob_y = LIGHT_REST_BOB_AMP;
+        rest_bob_vel = 0.0f;
+        is_ready = 1;
     }
-    for (int i = 0; i < LIGHT0_MARKER_SEGMENTS; i++) {
-        float angle_0_rad = ((float)i / (float)LIGHT0_MARKER_SEGMENTS) * (2.0f * PI);
-        float angle_1_rad = ((float)(i + 1) / (float)LIGHT0_MARKER_SEGMENTS) * (2.0f * PI);
-        float ring_cos_0 = COSF(angle_0_rad) * LIGHT0_MARKER_RADIUS;
-        float ring_sin_0 = SINF(angle_0_rad) * LIGHT0_MARKER_RADIUS;
-        float ring_cos_1 = COSF(angle_1_rad) * LIGHT0_MARKER_RADIUS;
-        float ring_sin_1 = SINF(angle_1_rad) * LIGHT0_MARKER_RADIUS;
-        for (int j = 0; j < LIGHT0_MARKER_RING_COUNT; j++) {
-            float ring_angle_rad = ((float)j / (float)LIGHT0_MARKER_RING_COUNT) * PI;
-            float ring_x = COSF(ring_angle_rad);
-            float ring_y = SINF(ring_angle_rad);
-            Vector3 point_0 = {
-                position.x + ring_cos_0 * ring_x,
-                position.y + ring_cos_0 * ring_y,
-                position.z + ring_sin_0,
-            };
-            Vector3 point_1 = {
-                position.x + ring_cos_1 * ring_x,
-                position.y + ring_cos_1 * ring_y,
-                position.z + ring_sin_1,
-            };
-            rlDisableDepthTest();
-            DrawLine3D(point_0, point_1, marker_color);
-            rlEnableDepthTest();
+    float dt = CLAMP(GetFrameTime(), 0.0f, 1.0f / 30.0f);
+    cur_surface_y = LERP(cur_surface_y, center_surface_pos.y, CLAMP(dt * surface_follow_rate, 0.0f, 1.0f));
+    rest_bob_vel += (cur_surface_y - prev_surface_y) * surface_impulse_gain;
+    rest_bob_vel += ((LIGHT_REST_BOB_AMP - rest_bob_y) * bob_stiffness - rest_bob_vel * bob_friction) * dt;
+    rest_bob_y = CLAMP(rest_bob_y + rest_bob_vel * dt, LIGHT_REST_BOB_AMP - bob_ceiling, LIGHT_REST_BOB_AMP + bob_ceiling);
+    prev_surface_y = cur_surface_y;
+    return (Vector3){anchor_pos.x + center_surface_pos.x, anchor_pos.y + cur_surface_y + rest_bob_y, anchor_pos.z + center_surface_pos.z};
+}
+
+static inline void update_light_camera_strafe(const Camera3D* camera, Vector3 rest_pos, BoundingBox scene_bbox) {
+    float strafe_axis_x =
+        (FABSF(GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X)) < LIGHT_STRAFE_DEADZONE) ? 0.0f : GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X);
+    float strafe_axis_y =
+        (FABSF(GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y)) < LIGHT_STRAFE_DEADZONE) ? 0.0f : GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y);
+
+    Vector3 cam_forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
+    Vector3 cam_right = Vector3Normalize(Vector3CrossProduct(cam_forward, camera->up));
+    Vector3 cam_up = Vector3CrossProduct(cam_right, cam_forward);
+    Vector3 strafe_pos_offset =
+        Vector3Add(Vector3Scale(cam_right, strafe_axis_x * LIGHT_STRAFE_RANGE), Vector3Scale(cam_up, -strafe_axis_y * LIGHT_STRAFE_RANGE));
+    Vector3 target_pos = Vector3Add(rest_pos, strafe_pos_offset);
+
+    float dt = CLAMP(GetFrameTime(), 0.0f, 1.0f / 30.0f);
+    float strafe_lerp = CLAMP(dt * LIGHT_STRAFE_RESPONSE, 0.0f, 1.0f);
+    light0_pos = Vector3Lerp(light0_pos, target_pos, strafe_lerp);
+
+    light0_pos.x = CLAMP(light0_pos.x, scene_bbox.min.x, scene_bbox.max.x);
+    light0_pos.y = CLAMP(light0_pos.y, scene_bbox.min.y, scene_bbox.max.y);
+    light0_pos.z = CLAMP(light0_pos.z, scene_bbox.min.z, scene_bbox.max.z);
+}
+
+#define LIGHT0_CAPSULE_CROWN_COUNT 3
+#define LIGHT0_CAPSULE_SEGMENT_COUNT 12
+#define LIGHT0_LANTERN_RADIUS 0.33f
+#define LIGHT0_LANTERN_RIB_PAIR_COUNT 4
+
+//TODO: based off of capsule gen mesh but with a silly onset driven spin...
+static inline void draw_lantern(Vector3 pos) {
+    Color lantern_color = SUNFLOWER;
+    static float spin_phase = 0.0f;
+    static float spin_vel = 0.03f;
+    static float spin_drive = 0.0f;
+    static float prev_onset = 0.0f;
+    float dt = CLAMP(GetFrameTime(), 0.0f, 1.0f / 30.0f);
+    float onset = CLAMP((onset_gate - 0.18f) / 0.82f, 0.0f, 1.0f);
+    float onset_burst = FMAXF(onset - prev_onset, 0.0f);
+    prev_onset = onset;
+    float lantern_radius = LIGHT0_LANTERN_RADIUS * 0.94f;
+    float spin_idle = 0.035f / lantern_radius;
+    float spin_max = 3.40f / lantern_radius;
+    float spin_accel = 52.0f / lantern_radius;
+    float spin_drag = 3.25f;
+    float spin_drive_drag = 13.0f;
+    float onset_impulse = SQRTF(onset_burst) * (0.45f + 0.55f * onset);
+    spin_drive = FMAXF(spin_drive * EXPF(-spin_drive_drag * dt), onset_impulse);
+    spin_vel += spin_drive * spin_accel * dt;
+    spin_vel = FMINF(spin_vel, spin_max);
+    spin_vel = spin_idle + (spin_vel - spin_idle) * EXPF(-spin_drag * dt);
+    spin_phase -= spin_vel * dt;
+    if (spin_phase < -4096.0f * PI)
+        spin_phase += 4096.0f * PI;
+    if (spin_phase > 4096.0f * PI)
+        spin_phase -= 4096.0f * PI;
+    float body_half_height = LIGHT0_LANTERN_RADIUS * 0.38f;
+    int rib_count = LIGHT0_LANTERN_RIB_PAIR_COUNT * 2;
+    float rib_slice_angle_step = (2.0f * PI) / (float)rib_count;
+    float crown_arc_angle_step = (0.5f * PI) / (float)rib_count;
+    float spin_phase_offset = spin_phase;
+    int crown_index = CLAMP((int)(0.82f * (float)rib_count), 1, rib_count - 1);
+    float crown_angle = crown_arc_angle_step * (float)crown_index;
+#define LANTERN_VERTEX(_cap_center_y, _cap_sign, _crown_sin, _crown_cos, _rib_sin, _rib_cos)                                                                   \
+    ((Vector3){pos.x + (_rib_sin) * (_crown_cos) * lantern_radius,                                                                                             \
+               pos.y + (_cap_center_y) + (_cap_sign) * (_crown_sin) * lantern_radius,                                                                          \
+               pos.z + (_rib_cos) * (_crown_cos) * lantern_radius})
+    for (int i = 0; i < rib_count; i++) {
+        float rib_phase = ((2.0f * PI * (float)i) / (float)rib_count) + spin_phase_offset;
+        float rib_slice_sin = SINF(rib_phase);
+        float rib_slice_cos = COSF(rib_phase);
+        DrawLine3D((Vector3){pos.x + rib_slice_sin * lantern_radius, pos.y + body_half_height, pos.z + rib_slice_cos * lantern_radius},
+                   (Vector3){pos.x + rib_slice_sin * lantern_radius, pos.y - body_half_height, pos.z + rib_slice_cos * lantern_radius},
+                   lantern_color);
+    }
+    for (int i = 0; i < rib_count; i++) {
+        float rib_slice_phase = rib_slice_angle_step * (float)i + spin_phase_offset;
+        float rib_slice_sin = SINF(rib_slice_phase);
+        float rib_slice_cos = COSF(rib_slice_phase);
+        for (int k = 0; k < crown_index; k++) {
+            float crown_arc_angle_0 = crown_arc_angle_step * (float)k;
+            float crown_arc_angle_1 = crown_arc_angle_step * (float)(k + 1);
+            float crown_arc_sin_0 = SINF(crown_arc_angle_0);
+            float crown_arc_cos_0 = COSF(crown_arc_angle_0);
+            float crown_arc_sin_1 = SINF(crown_arc_angle_1);
+            float crown_arc_cos_1 = COSF(crown_arc_angle_1);
+            DrawLine3D(LANTERN_VERTEX(-body_half_height, -1.0f, crown_arc_sin_0, crown_arc_cos_0, rib_slice_sin, rib_slice_cos),
+                       LANTERN_VERTEX(-body_half_height, -1.0f, crown_arc_sin_1, crown_arc_cos_1, rib_slice_sin, rib_slice_cos),
+                       lantern_color);
+            DrawLine3D(LANTERN_VERTEX(body_half_height, 1.0f, crown_arc_sin_0, crown_arc_cos_0, rib_slice_sin, rib_slice_cos),
+                       LANTERN_VERTEX(body_half_height, 1.0f, crown_arc_sin_1, crown_arc_cos_1, rib_slice_sin, rib_slice_cos),
+                       lantern_color);
         }
     }
+    for (int i = 0; i < rib_count; i++) {
+        float crown_phase_0 = rib_slice_angle_step * (float)i + spin_phase_offset;
+        float crown_phase_1 = rib_slice_angle_step * (float)(i + 1) + spin_phase_offset;
+        float crown_sin = SINF(crown_angle);
+        float crown_cos = COSF(crown_angle);
+        DrawLine3D(LANTERN_VERTEX(-body_half_height, -1.0f, crown_sin, crown_cos, SINF(crown_phase_0), COSF(crown_phase_0)),
+                   LANTERN_VERTEX(-body_half_height, -1.0f, crown_sin, crown_cos, SINF(crown_phase_1), COSF(crown_phase_1)),
+                   lantern_color);
+        DrawLine3D(LANTERN_VERTEX(body_half_height, 1.0f, crown_sin, crown_cos, SINF(crown_phase_0), COSF(crown_phase_0)),
+                   LANTERN_VERTEX(body_half_height, 1.0f, crown_sin, crown_cos, SINF(crown_phase_1), COSF(crown_phase_1)),
+                   lantern_color);
+    }
+#undef LANTERN_VERTEX
+}
+
+static inline void draw_lantern_glow(Vector3 pos) {
+    Color glow_color = SUNFLOWER;
+    static float glow = 0.0f;
+    float dt = CLAMP(GetFrameTime(), 0.0f, 1.0f / 30.0f);
+    float onset_glow_target = CLAMP(onset_gate, 0.0f, 1.0f);
+    glow = LERP(glow, onset_glow_target, CLAMP(dt * (onset_glow_target > glow ? 5.0f : 0.85f), 0.0f, 1.0f));
+    float g = glow * glow;
+    float R = LIGHT0_LANTERN_RADIUS * (1.0f + g * 1.15f);
+    float r0 = R * 0.94f, r1 = R * 0.40f;
+    float y0 = R * 0.38f, y1 = R * 0.18f;
+    Vector3 a0 = {pos.x, pos.y - y0, pos.z}, b0 = {pos.x, pos.y + y0, pos.z};
+    Vector3 a1 = {pos.x, pos.y - y1, pos.z}, b1 = {pos.x, pos.y + y1, pos.z};
+    rlDisableDepthTest();
+    glow_color.a = (unsigned char)(14.0f + g * 34.0f);
+    DrawCapsule(a0, b0, r0, LIGHT0_CAPSULE_SEGMENT_COUNT, LIGHT0_CAPSULE_CROWN_COUNT, glow_color);
+    glow_color.a = (unsigned char)(34.0f + g * 72.0f);
+    DrawCapsule(a1, b1, r1, LIGHT0_CAPSULE_SEGMENT_COUNT / 2, LIGHT0_CAPSULE_CROWN_COUNT / 2 + 1, glow_color);
+    rlEnableDepthTest();
 }
 
 #define CAMERA_FOVY_MIN 0.1f
@@ -751,7 +927,7 @@ static inline void draw_light_position_marker(Vector3 position) {
 #define CAMERA_PITCH_MIN (-PI / 2.0f + 0.1f)
 #define CAMERA_PITCH_MAX (PI / 2.0f - 0.1f)
 #define BUTTON_DOWN_NAV_INITIAL_DELAY_SECONDS 0.35f
-//TODO: hardmode-> find the exact lane advance cadence for this value, lock it to playback rate a default,
+// TODO: hardmode-> find the exact lane advance cadence for this value, lock it to playback rate a default,
 // then somehow allow for playback snippets to get fed to the device at player controlled update rates...??
 #define BUTTON_DOWN_NAV_INTERVAL_SECONDS (0.125f / 2.0f)
 
@@ -782,52 +958,6 @@ static inline void update_camera_orbit(Camera3D* camera, float dt) {
     camera->position.y = camera->target.y + orbit_radius * sinf(pitch);
     camera->position.z = camera->target.z + orbit_radius * cosf(pitch) * sinf(yaw);
     camera->fovy = fovy;
-}
-
-#define PADMOUSE_DEADZONE 0.20f
-#define PADMOUSE_SPEED 400.0f
-#define PADMOUSE_HOVER_RADIUS_PIXELS 20.0f
-static Vector2 padmouse_pos = {0.5f * SCREEN_WIDTH, 0.5f * SCREEN_HEIGHT};
-
-static inline void update_padmouse(float dt, const Camera3D* camera) {
-    float axis_x = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X);
-    float axis_y = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y);
-    if (FABSF(axis_x) < PADMOUSE_DEADZONE)
-        axis_x = 0.0f;
-    if (FABSF(axis_y) < PADMOUSE_DEADZONE)
-        axis_y = 0.0f;
-
-    padmouse_pos.x += axis_x * PADMOUSE_SPEED * dt;
-    padmouse_pos.y += axis_y * PADMOUSE_SPEED * dt;
-    padmouse_pos.x = CLAMP(padmouse_pos.x, 0.0f, (float)(GetScreenWidth() - 1));
-    padmouse_pos.y = CLAMP(padmouse_pos.y, 0.0f, (float)(GetScreenHeight() - 1));
-    Vector2 light_screen_pos = GetWorldToScreen(light0_position, *camera);
-    float light_dx = padmouse_pos.x - light_screen_pos.x;
-    float light_dy = padmouse_pos.y - light_screen_pos.y;
-    float light_dist_sq = light_dx * light_dx + light_dy * light_dy;
-    float light_hover_radius_sq = PADMOUSE_HOVER_RADIUS_PIXELS * PADMOUSE_HOVER_RADIUS_PIXELS;
-    padmouse_light0_hovered = light_dist_sq <= light_hover_radius_sq;
-    if (padmouse_light0_grabbed && !IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
-        padmouse_light0_grabbed = false;
-    } else if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) && padmouse_light0_hovered) {
-        padmouse_light0_grabbed = true;
-    }
-
-    if (padmouse_light0_grabbed) {
-        Ray screen_ray = GetScreenToWorldRay(padmouse_pos, *camera);
-        Vector3 plane_normal = Vector3Normalize(Vector3Subtract(camera->position, camera->target));
-        float plane_dist = Vector3DotProduct(light0_position, plane_normal);
-        float denom = Vector3DotProduct(screen_ray.direction, plane_normal);
-        float intersection_dist = (plane_dist - Vector3DotProduct(screen_ray.position, plane_normal)) / denom;
-        if (intersection_dist > 0.0f) {
-            light0_position = Vector3Add(screen_ray.position, Vector3Scale(screen_ray.direction, intersection_dist));
-        }
-    }
-}
-
-static inline void draw_padmouse(void) {
-    DrawCircleLines((int)padmouse_pos.x, (int)padmouse_pos.y, 7.0f, Fade(SUNFLOWER, 0.8f));
-    DrawPixel((int)padmouse_pos.x, (int)padmouse_pos.y, SUNFLOWER);
 }
 
 static float sticky_nav_at[2] = {0};
@@ -880,7 +1010,7 @@ static void draw_paused_wave_cursor_lane_marker(int point_count) {
     Color wave_cursor_colors[mesh_vertex_count];
     float blink = SINF((float)GetTime() * WAVE_CURSOR_BLINK_RATE);
     int lane_index = seek_delta_chunks;
-    float z_shift = 0.0f;
+    float z_offset = 0.0f;
     Color blink_color = CLITERAL(Color){
         (unsigned char)((float)NEON_CARROT.r * (0.725f + 0.275f * blink)),
         (unsigned char)((float)NEON_CARROT.g * (0.725f + 0.275f * blink)),
@@ -889,10 +1019,10 @@ static void draw_paused_wave_cursor_lane_marker(int point_count) {
     };
     if (lane_index < 0) {
         lane_index = 0;
-        z_shift = -0.75f * LANE_SPACING_SCALE;
+        z_offset = -0.75f * LANE_SPACING_SCALE;
     } else if (lane_index >= LANE_COUNT) {
         lane_index = LANE_COUNT - 1;
-        z_shift = 0.75f * LANE_SPACING_SCALE;
+        z_offset = 0.75f * LANE_SPACING_SCALE;
     }
     for (int i = 0; i < mesh_vertex_count; i++) {
         wave_cursor_colors[i] = BLANK;
@@ -903,15 +1033,20 @@ static void draw_paused_wave_cursor_lane_marker(int point_count) {
 
     unsigned char* saved_colors = wave_cursor_model->meshes[0].colors;
     int saved_texture_id = wave_cursor_model->materials[0].maps[MATERIAL_MAP_DIFFUSE].texture.id;
+    float* saved_texcoords = wave_cursor_model->meshes[0].texcoords;
+    if (wave_cursor_model->meshes[0].texcoords2 != NULL) {
+        wave_cursor_model->meshes[0].texcoords = wave_cursor_model->meshes[0].texcoords2;
+    }
     wave_cursor_model->meshes[0].colors = (unsigned char*)wave_cursor_colors;
     wave_cursor_model->materials[0].maps[MATERIAL_MAP_DIFFUSE].texture.id = wave_cursor_texture.id;
     rlDisableDepthTest();
     rlDisableBackfaceCulling();
-    DrawModelEx(*wave_cursor_model, (Vector3){0.0f, 0.0f, z_shift}, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
+    DrawModelEx(*wave_cursor_model, (Vector3){0.0f, 0.0f, z_offset}, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
     rlEnableBackfaceCulling();
     rlEnableDepthTest();
     wave_cursor_model->materials[0].maps[MATERIAL_MAP_DIFFUSE].texture.id = saved_texture_id;
     wave_cursor_model->meshes[0].colors = saved_colors;
+    wave_cursor_model->meshes[0].texcoords = saved_texcoords;
 }
 
 static inline void draw_wave_cursor_wheel_hud_row(const char* s, float x, float y, Color c) {
@@ -1072,29 +1207,37 @@ static void update_playback_controls_fft_spectrum(void) {
     }
 }
 
-#define DEFAULT_AUDIO_TRACK_SHADERTOY_EXPERIMENT 0
-#define DEFAULT_AUDIO_TRACK_ELECTRONEBULAE 1
-#define DEFAULT_AUDIO_TRACK_DDS_FFM 2
-#define DEFAULT_AUDIO_TRACK_RAMA 3
-#define DEFAULT_AUDIO_TRACK_CT_LOR 4
-#define DEFAULT_AUDIO_TRACK_AT_UNTITLED 5
-#define DEFAULT_AUDIO_TRACK_TJ_SAYO 6
-#define DEFAULT_AUDIO_TRACK_KREUZSCHMERZEN 7
-#define DEFAULT_AUDIO_TRACK_KREUZSCHMERZEN_RENT_DUE 8
-#define AUDIO_TRACK_COUNT 9
+#define SHADERTOY_EXPERIMENT 0
+#define SHADERTOY_ELECTRONEBULAE 1
+#define SHADERTOY_8BIT 2
+#define SHADERTOY_GEOMETRIC_PERSON 3
+#define SHADERTOY_TROPICAL 4
+#define SHADERTOY_XTRACK 5
+#define DDS_FFM 6
+#define RAMA 7
+#define CT_LOR 8
+#define AT_UNTITLED 9
+#define TJ_SAYO 10
+#define KREUZSCHMERZEN_YOU_KNOW_WHY 11
+#define KREUZSCHMERZEN_RENT_DUE 12
+#define AUDIO_TRACK_COUNT 13
 
 #define AUDIO_TRACK_PATH(track_index)                                                                                                                          \
-    ((track_index) == DEFAULT_AUDIO_TRACK_SHADERTOY_EXPERIMENT ? RD_SHADERTOY_EXPERIMENT_22K_WAV                                                               \
-     : (track_index) == DEFAULT_AUDIO_TRACK_ELECTRONEBULAE     ? RD_SHADERTOY_ELECTRONEBULAE_ONE_FOURTH_22K_WAV                                                \
-     : (track_index) == DEFAULT_AUDIO_TRACK_DDS_FFM            ? RD_DDS_FFM_22K_WAV                                                                            \
-     : (track_index) == DEFAULT_AUDIO_TRACK_RAMA               ? RD_RAMA_22K_WAV                                                                               \
-     : (track_index) == DEFAULT_AUDIO_TRACK_CT_LOR             ? RD_CT_LOR_22K_WAV                                                                             \
-     : (track_index) == DEFAULT_AUDIO_TRACK_AT_UNTITLED        ? RD_AT_UNTITLED_22K_WAV                                                                        \
-     : (track_index) == DEFAULT_AUDIO_TRACK_TJ_SAYO            ? RD_TJ_SAYO_22K_WAV                                                                            \
-     : (track_index) == DEFAULT_AUDIO_TRACK_KREUZSCHMERZEN     ? RD_KREUZSCHMERZEN_YOU_KNOW_WHY_22K_WAV                                                        \
-                                                               : RD_KREUZSCHMERZEN_RENT_DUE_22K_WAV)
+    ((track_index) == SHADERTOY_EXPERIMENT          ? RD_SHADERTOY_EXPERIMENT_22K_WAV                                                                          \
+     : (track_index) == SHADERTOY_ELECTRONEBULAE    ? RD_SHADERTOY_ELECTRONEBULAE_22K_WAV                                                                      \
+     : (track_index) == SHADERTOY_8BIT              ? RD_SHADERTOY_8BIT_22K_WAV                                                                                \
+     : (track_index) == SHADERTOY_GEOMETRIC_PERSON  ? RD_SHADERTOY_GEOMETRIC_PERSON_22K_WAV                                                                    \
+     : (track_index) == SHADERTOY_TROPICAL          ? RD_SHADERTOY_TROPICAL_22K_WAV                                                                            \
+     : (track_index) == SHADERTOY_XTRACK            ? RD_SHADERTOY_XTRACK_22K_WAV                                                                              \
+     : (track_index) == DDS_FFM                     ? RD_DDS_FFM_22K_WAV                                                                                       \
+     : (track_index) == RAMA                        ? RD_RAMA_22K_WAV                                                                                          \
+     : (track_index) == CT_LOR                      ? RD_CT_LOR_22K_WAV                                                                                        \
+     : (track_index) == AT_UNTITLED                 ? RD_AT_UNTITLED_22K_WAV                                                                                   \
+     : (track_index) == TJ_SAYO                     ? RD_TJ_SAYO_22K_WAV                                                                                       \
+     : (track_index) == KREUZSCHMERZEN_YOU_KNOW_WHY ? RD_KREUZSCHMERZEN_YOU_KNOW_WHY_22K_WAV                                                                   \
+                                                    : RD_KREUZSCHMERZEN_RENT_DUE_22K_WAV)
 
-static int audio_track_index = DEFAULT_AUDIO_TRACK_SHADERTOY_EXPERIMENT;
+static int audio_track_index = SHADERTOY_EXPERIMENT;
 static Wave loaded_audio_tracks[AUDIO_TRACK_COUNT] = {0};
 
 static inline void load_audio_tracks(void) {
@@ -1127,6 +1270,7 @@ static inline void update_audio_track_cycle(void) {
         return;
     }
 
+    bool was_paused = is_paused;
     audio_track_index += dir;
     if (audio_track_index < 0) {
         audio_track_index = AUDIO_TRACK_COUNT - 1;
@@ -1134,21 +1278,21 @@ static inline void update_audio_track_cycle(void) {
         audio_track_index = 0;
     }
 
-    StopAudioStream(audio_stream);
     set_audio_track(audio_track_index);
     wave_cursor = 0;
     paused_wave_cursor = 0;
     seek_delta_chunks = 0;
     is_paused = false;
-    PlayAudioStream(audio_stream);
+    reset_sticky_nav();
+    if (was_paused) {
+        PlayAudioStream(audio_stream);
+    }
 }
 
-#define PITCH_CLASS_COUNT 12
-#define PITCH_CLASS_INVERSE_LN_2 1.4426950408889634f
-#define PITCH_CLASS_SEMITONES_PER_OCTAVE 12.0f
-#define PITCH_CLASS_TUNING_RADIUS_SEMITONES 0.85f
-#define PITCH_CLASS_VISIBILITY_MIN 0.02f
-#define PITCH_CLASS_VISIBILITY_MAX 0.75f
+#define CHROMA_COUNT 12
+#define CHROMA_INVERSE_LN_2 1.4426950408889634f
+#define CHROMA_SEMITONES_PER_OCTAVE 12.0f
+#define CHROMA_TUNING_RADIUS_SEMITONES 0.85f
 #define C9 8372.02f
 #define Db9 8870.0f
 #define D9 9398.0f
@@ -1162,22 +1306,22 @@ static inline void update_audio_track_cycle(void) {
 #define Bb9 14918.0f
 #define B9 15804.0f
 #define REF_HZ_LUT {C9, Db9, D9, Eb9, E9, F9, Gb9, G9, Ab9, A9, Bb9, B9}
-#define REF_HZ_LOOKUP(index) (((const float[PITCH_CLASS_COUNT])REF_HZ_LUT)[(index)])
+#define REF_HZ_LOOKUP(index) (((const float[CHROMA_COUNT])REF_HZ_LUT)[(index)])
 #define ACCIDENTALS_LUT {1.0f, 0.5f, 1.0f, 0.5f, 1.0f, 1.0f, 0.5f, 1.0f, 0.5f, 1.0f, 0.5f, 1.0f}
-#define ACCIDENTAL_LOOKUP(index) (((const float[PITCH_CLASS_COUNT])ACCIDENTALS_LUT)[(index)])
-#define WUXING_COLOR_LOOKUP(index) (((const Color[PITCH_CLASS_COUNT])WUXING_PITCH_CLASS_LUT)[(index)])
+#define ACCIDENTAL_LOOKUP(index) (((const float[CHROMA_COUNT])ACCIDENTALS_LUT)[(index)])
+#define WUXING_COLOR_LOOKUP(index) (((const Color[CHROMA_COUNT])WUXING_CHROMA_LUT)[(index)])
 
-static Color sample_pitch_class_palette(unsigned char chroma_index, float confidence) {
-    Color base_color = WUXING_COLOR_LOOKUP(chroma_index);
-    float visibility = CLAMP((confidence - PITCH_CLASS_VISIBILITY_MIN) / (PITCH_CLASS_VISIBILITY_MAX - PITCH_CLASS_VISIBILITY_MIN), 0.0f, 1.0f);
-    if (visibility <= 0.0f) {
-        return BLANK;
+static Color sample_chroma_palette(unsigned char chroma_id, float chroma_mask) {
+    Color base_color = WUXING_COLOR_LOOKUP(chroma_id);
+    float adaptive_chroma_mask_floor = adaptive_chroma_mask_mean - adaptive_chroma_mask_deviation * GLOBAL_ADAPTIVE_GATE_FLOOR_DEVIATION_SCALE;
+    float adaptive_chroma_mask_ceiling = adaptive_chroma_mask_mean + adaptive_chroma_mask_deviation * GLOBAL_ADAPTIVE_GATE_CEILING_DEVIATION_SCALE;
+    float gate = 0.0f;
+    if (adaptive_chroma_mask_ceiling > adaptive_chroma_mask_floor) {
+        gate = CLAMP((chroma_mask - adaptive_chroma_mask_floor) / (adaptive_chroma_mask_ceiling - adaptive_chroma_mask_floor), 0.0f, 1.0f);
     }
-
-    visibility = POWF(visibility, 0.45f);
-    float accidental_gain = 0.70f + 0.30f * ACCIDENTAL_LOOKUP(chroma_index);
-    float brightness = (0.35f + 0.65f * visibility) * accidental_gain;
-    brightness = CLAMP(brightness, 0.0f, 1.0f);
+    gate = POWF(gate, 0.45f);
+    float accidental_gain = 0.70f + 0.30f * ACCIDENTAL_LOOKUP(chroma_id);
+    float brightness = CLAMP((0.35f + 0.65f * gate) * accidental_gain, 0.0f, 1.0f);
 
     return (Color){
         (unsigned char)((float)base_color.r * brightness),
@@ -1187,150 +1331,100 @@ static Color sample_pitch_class_palette(unsigned char chroma_index, float confid
     };
 }
 
-static void update_mesh_colors_pitch_class(Color* colors, const unsigned char* chroma_index_field, const float* chroma_strength_field, int point_count) {
+static void update_mesh_colors_chroma(Color* colors, const unsigned char* lane_chroma_id, const float* chroma_mask_field, int point_count) {
     for (int i = 0; i < LANE_COUNT; i++) {
         for (int j = 0; j < point_count; j++) {
             int k = i * point_count + j;
-            unsigned char chroma_index = chroma_index_field[k];
-            float strength = chroma_strength_field[k];
-
-            if (strength <= PITCH_CLASS_VISIBILITY_MIN || chroma_index >= PITCH_CLASS_COUNT) {
-                colors[k] = BLANK;
-                continue;
-            }
-
-            Color color = sample_pitch_class_palette(chroma_index, strength);
-            color.a = (unsigned char)((float)DRAW_COLOR_CHANNEL_MAX * CLAMP(strength, 0.0f, 1.0f));
-            colors[k] = color;
+            float chroma_mask = chroma_mask_field[k];
+            Color chroma_color = sample_chroma_palette(lane_chroma_id[i], chroma_mask);
+            chroma_color.a = (unsigned char)((float)DRAW_COLOR_CHANNEL_MAX * CLAMP(chroma_mask, 0.0f, 1.0f));
+            colors[k] = chroma_color;
         }
     }
 }
 
-static inline Vector2 spectrum_band_point_sample_bin_bounds(int point_index, int point_count, int band_bin_min, int band_bin_max) {
-    int point_span = point_count - 1;
-    int bin_span = band_bin_max - band_bin_min;
-    int center_bin = band_bin_min;
-    int left_neighbor_center_bin = band_bin_min;
-    int right_neighbor_center_bin = band_bin_min;
-
-    if (point_count > 1) {
-        center_bin = band_bin_min + (point_index * bin_span) / point_span;
-        left_neighbor_center_bin = (point_index > 0) ? band_bin_min + ((point_index - 1) * bin_span) / point_span : center_bin;
-        right_neighbor_center_bin = (point_index < point_span) ? band_bin_min + ((point_index + 1) * bin_span) / point_span : center_bin;
-    }
-
-    int sample_bin_min = (point_index > 0) ? ((left_neighbor_center_bin + center_bin) / 2) : band_bin_min;
-    int sample_bin_max = (point_index < point_span) ? ((center_bin + right_neighbor_center_bin + 1) / 2) : band_bin_max;
-    sample_bin_min = CLAMP(sample_bin_min, band_bin_min, band_bin_max);
-    sample_bin_max = CLAMP(sample_bin_max, sample_bin_min, band_bin_max);
-    return (Vector2){(float)sample_bin_min, (float)sample_bin_max};
-}
-
-static void build_pitch_class_color_field(unsigned char* chroma_index_field,
-                                          float* chroma_strength_field,
-                                          const float* front_lane_point_values,
-                                          const float* bin_levels, //TODO: this needs to be raw levels, but you can mess with it
-                                          int point_count,
-                                          int band_bin_min,
-                                          int band_bin_max) {
+static void build_chroma_fields(unsigned char* lane_chroma_id,
+                                float* chroma_mask_field,
+                                const float* ridge_point_values,
+                                const float* spectrum_magnitudes,
+                                int point_count,
+                                int chroma_bin_min,
+                                int chroma_bin_max) {
     // https://librosa.org/doc/main/generated/librosa.feature.chroma_stft.html
     // https://librosa.org/doc/main/generated/librosa.filters.chroma.html
-    float chroma_energy[PITCH_CLASS_COUNT] = {0};
-    int source_bin_min = band_bin_min;
-    int source_bin_max = band_bin_max;
-    if (source_bin_min < 1) {
-        source_bin_min = 1;
-    }
-    if (source_bin_max > ANALYSIS_SPECTRUM_BIN_COUNT - 1) {
-        source_bin_max = ANALYSIS_SPECTRUM_BIN_COUNT - 1;
-    }
+    float chroma_sum[CHROMA_COUNT] = {0};
 
-    if (source_bin_max < source_bin_min) {
-        for (int i = 0; i < point_count; i++) {
-            chroma_index_field[i] = 0;
-            chroma_strength_field[i] = 0.0f;
-        }
-        return;
-    }
+    for (int i = chroma_bin_min; i <= chroma_bin_max; i++) {
+        float frequency = ((float)i * (float)ANALYSIS_SAMPLE_RATE) / (float)ANALYSIS_WINDOW_SIZE_IN_FRAMES;
+        float octave = LOGF(frequency / 27.5f) * CHROMA_INVERSE_LN_2; // 27.5 = 440.0 / 16.0, librosa hz_to_octs A0 reference
+        float chroma_pos = 12.0f * octave;                            // 12.0 = n_chroma / bins_per_octave in librosa chroma default
 
-    for (int i = source_bin_min; i <= source_bin_max; i++) {
-        float bin_level = bin_levels[i];
-        if (bin_level <= 0.0f) {
-            continue;
-        }
-
-        float bin_hz = ((float)i * (float)ANALYSIS_SAMPLE_RATE) / (float)ANALYSIS_WINDOW_SIZE_IN_FRAMES;
-        float bin_octave = LOGF(bin_hz / 27.5f) * PITCH_CLASS_INVERSE_LN_2; // 27.5 = 440.0 / 16.0, librosa hz_to_octs A0 reference.
-        float bin_chroma_position = 12.0f * bin_octave;                     // 12.0 = n_chroma / bins_per_octave in librosa chroma default.
-
-        float bin_width_chroma = 1.0f; // librosa appends [1] for the final binwidthbins entry.
-        if (i < ANALYSIS_SPECTRUM_BIN_COUNT - 1) {
-            float next_bin_hz = ((float)(i + 1) * (float)ANALYSIS_SAMPLE_RATE) / (float)ANALYSIS_WINDOW_SIZE_IN_FRAMES;
-            float next_bin_octave = LOGF(next_bin_hz / 27.5f) * PITCH_CLASS_INVERSE_LN_2;   // 27.5 = 440.0 / 16.0, librosa hz_to_octs.
-            float next_bin_chroma_position = 12.0f * next_bin_octave;                       // 12.0 = n_chroma.
-            bin_width_chroma = FMAXF(next_bin_chroma_position - bin_chroma_position, 1.0f); // librosa: maximum(frqbins[1:] - frqbins[:-1], 1.0).
-        }
+        int next_i = MINI(i + 1, ANALYSIS_SPECTRUM_BIN_COUNT - 1);
+        float next_frequency = ((float)next_i * (float)ANALYSIS_SAMPLE_RATE) / (float)ANALYSIS_WINDOW_SIZE_IN_FRAMES;
+        float next_octave = LOGF(next_frequency / 27.5f) * CHROMA_INVERSE_LN_2; // 27.5 = 440.0 / 16.0, librosa hz_to_octs
+        float next_chroma_pos = 12.0f * next_octave;                            // 12.0 = n_chroma
+        float chroma_width = FMAXF(next_chroma_pos - chroma_pos, 1.0f);         // librosa: maximum(frqbins[1:] - frqbins[:-1], 1.0)
 
         float filter_l2_sum = 0.0f;
-        for (int j = 0; j < PITCH_CLASS_COUNT; j++) {
-            float chroma_filter_row = (float)j + 3.0f; // 3.0 = librosa base_c=True roll offset for 12 chroma bins.
-            float chroma_delta = bin_chroma_position - chroma_filter_row;
-            chroma_delta = FMODF(chroma_delta + 6.0f + 120.0f, 12.0f) - 6.0f; // 6.0 = round(12/2), 120.0 = 10*12, 12.0 = n_chroma.
-            float chroma_filter_weight =
-                EXPF(-0.5f * POWF((2.0f * chroma_delta) / bin_width_chroma,
-                                  2.0f)); // 2.0 = librosa "2*D to make them narrower". Gaussian bump: wts = exp(-0.5 * (2 * D / binwidthbins) ** 2)
-            filter_l2_sum += chroma_filter_weight * chroma_filter_weight; // librosa filters.chroma default norm=2, normalize each FFT-bin column.
+        for (int j = 0; j < CHROMA_COUNT; j++) {
+            float filter_chroma = (float)j + 3.0f; // 3.0 = librosa base_c=True roll offset for 12 chroma bins
+            float chroma_delta = chroma_pos - filter_chroma;
+            chroma_delta = FMODF(chroma_delta + 6.0f + 120.0f, 12.0f) - 6.0f; // librosa: remainder(D + n_chroma/2 + 10*n_chroma, n_chroma) - n_chroma/2
+            float chroma_filter_weight = EXPF(-0.5f * POWF((2.0f * chroma_delta) / chroma_width,
+                                                           2.0f));        // librosa.filters.chroma: Gaussian bumps, exp(-0.5 * (2 * D / binwidthbins) ** 2)
+            filter_l2_sum += chroma_filter_weight * chroma_filter_weight; // librosa.filters.chroma(..., norm=2): util.normalize(wts, norm=norm, axis=0)
         }
 
         float filter_l2_norm = SQRTF(filter_l2_sum);
-        if (filter_l2_norm <= 1.0e-20f) { // librosa handles this inside util.normalize. AND SO SHOULD WE!!!!!!!!
-            continue;
-        }
-        float octave_delta = (bin_octave - 5.0f) / 2.0f; // 5.0 = ctroct, 2.0 = octwidth, librosa.filters.chroma defaults.
-        float octave_weight = EXPF(-0.5f * octave_delta * octave_delta);
-        float bin_power = bin_level * bin_level; // librosa.feature.chroma_stft uses a power spectrogram
+        float octave_delta = (octave - 5.0f) / 2.0f;                     // 5.0 = ctroct, 2.0 = octwidth, librosa.filters.chroma defaults
+        float octave_weight = EXPF(-0.5f * octave_delta * octave_delta); // librosa.filters.chroma: octave
+        float magnitude = spectrum_magnitudes[i];
+        float power = magnitude * magnitude; // librosa.feature.chroma_stft: _spectrogram(..., power=2)
 
-        for (int j = 0; j < PITCH_CLASS_COUNT; j++) {
-            float chroma_filter_row = (float)j + 3.0f; // 3.0 = librosa base_c=True roll offset for 12 chroma bins.
-            float chroma_delta = bin_chroma_position - chroma_filter_row;
-            chroma_delta = FMODF(chroma_delta + 6.0f + 120.0f, 12.0f) - 6.0f; // 6.0 = round(12/2), 120.0 = 10*12, 12.0 = n_chroma.
-            float chroma_filter_weight = EXPF(-0.5f * POWF((2.0f * chroma_delta) / bin_width_chroma, 2.0f)); // librosa Gaussian bump.
-            chroma_filter_weight /= filter_l2_norm;                                                          // librosa filters.chroma default norm=2, axis=0.
-            chroma_energy[j] += bin_power * chroma_filter_weight * octave_weight;
+        for (int j = 0; j < CHROMA_COUNT; j++) {
+            float filter_chroma = (float)j + 3.0f; // 3.0 = librosa base_c=True roll offset for 12 chroma bins
+            float chroma_delta = chroma_pos - filter_chroma;
+            chroma_delta = FMODF(chroma_delta + 6.0f + 120.0f, 12.0f) - 6.0f; // librosa: project wrapped chroma distance into [-6, +6]
+            float chroma_filter_weight = EXPF(-0.5f * POWF((2.0f * chroma_delta) / chroma_width, 2.0f)); // librosa Gaussian bump
+            chroma_filter_weight /= filter_l2_norm;                                                      // librosa.filters.chroma(..., norm=2, axis=0)
+            chroma_sum[j] += power * chroma_filter_weight * octave_weight; // librosa.feature.chroma_stft: raw_chroma = chromafb @ S
         }
     }
 
-    int best_chroma = 0;
-    float best_energy = 0.0f;
-    float next_energy = 0.0f;
-
-    for (int i = 0; i < PITCH_CLASS_COUNT; i++) {
-        float energy = chroma_energy[i];
-        if (energy > best_energy) {
-            next_energy = best_energy;
-            best_energy = energy;
-            best_chroma = i;
-        } else if (energy > next_energy) {
-            next_energy = energy;
+    float chroma_frame[CHROMA_COUNT] = {0};
+    float chroma_frame_max = 0.0f;
+    for (int i = 0; i < CHROMA_COUNT; i++) {
+        chroma_frame_max = FMAXF(chroma_frame_max, chroma_sum[i]);
+    }
+    float inv_chroma_frame_max = 1.0f / chroma_frame_max; // librosa.feature.chroma_stft(..., norm=inf): util.normalize(raw_chroma, norm=norm, axis=-2)
+    for (int i = 0; i < CHROMA_COUNT; i++) {
+        chroma_frame[i] = CLAMP(chroma_sum[i] * inv_chroma_frame_max, 0.0f, 1.0f);
+    }
+    int best_chroma_id = 0;
+    float best_chroma = 0.0f;
+    for (int i = 0; i < CHROMA_COUNT; i++) {
+        float chroma_value = chroma_frame[i];
+        if (chroma_value > best_chroma) {
+            best_chroma = chroma_value;
+            best_chroma_id = i;
         }
     }
-
-    float chroma_margin = 0.0f;
-    if (best_energy > 0.0f) {
-        // librosa.feature.chroma_stft default norm=inf normalizes each frame by max chroma!????????????!?!?!
-        chroma_margin = CLAMP((best_energy - next_energy) / best_energy, 0.0f, 1.0f);
-    }
-
+    *lane_chroma_id = (unsigned char)best_chroma_id;
+    float chroma_mask_sum = 0.0f;
     for (int i = 0; i < point_count; i++) {
-        float ridge_level = CLAMP(front_lane_point_values[i], 0.0f, 1.0f);
-        chroma_index_field[i] = (unsigned char)best_chroma;
-        if (best_energy <= 0.0f || ridge_level <= 0.0f) {
-            chroma_strength_field[i] = 0.0f;
-        } else {
-            float visibility =
-                ridge_level * (0.60f + 0.40f * chroma_margin); // 0.60/0.40 are visual weighting, not librosa.  WHAT WHAT WHAT SHOULD WE DECIDE BETTER?
-            chroma_strength_field[i] = POWF(CLAMP(visibility, 0.0f, 1.0f), 0.65f); // 0.65 is our display gamma???!?!? WHAT WHAT WHAT SHOULD WE DECIDE BETTER?
-        }
+        float ridge_value = CLAMP(ridge_point_values[i], 0.0f, 1.0f);
+        chroma_mask_field[i] = ridge_value * best_chroma; // custom
+        chroma_mask_sum += chroma_mask_field[i];
+    }
+    float chroma_mask_mean = chroma_mask_sum / (float)point_count;
+    if (!adaptive_chroma_mask_ready) {
+        adaptive_chroma_mask_mean = chroma_mask_mean;
+        adaptive_chroma_mask_deviation = chroma_mask_mean;
+        adaptive_chroma_mask_ready = 1;
+    } else {
+        float adaptive_chroma_mask_delta = FABSF(chroma_mask_mean - adaptive_chroma_mask_mean);
+        adaptive_chroma_mask_mean = LERP(adaptive_chroma_mask_mean, chroma_mask_mean, GLOBAL_ADAPTIVE_GATE_SMOOTHING_FACTOR);
+        adaptive_chroma_mask_deviation = LERP(adaptive_chroma_mask_deviation, adaptive_chroma_mask_delta, GLOBAL_ADAPTIVE_GATE_SMOOTHING_FACTOR);
     }
 }
 

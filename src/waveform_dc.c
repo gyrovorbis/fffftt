@@ -12,7 +12,7 @@ static void update_waveform_vertices(void) {
     for (int sample_index = 0; sample_index < ANALYSIS_WAVEFORM_SAMPLE_COUNT; sample_index++) {
         float sample_value = analysis_window_samples[sample_index * sample_stride];
         float normalized_sample = 0.5f * (1.0f + sample_value);
-        normalized_sample = (normalized_sample < 0.0f) ? 0.0f : (normalized_sample > 1.0f) ? 1.0f : normalized_sample;
+        normalized_sample = CLAMP(normalized_sample, 0.0f, 1.0f);
         float sample_x = ((float)sample_index + 0.5f) * sample_column_width;
         float sample_y = FLOORF(normalized_sample * (float)(SCREEN_HEIGHT - 1) + 0.5f);
         waveform_vertices[sample_index].x = sample_x;
@@ -31,10 +31,7 @@ static void render_waveform_frame(void) {
         int sample_x_min = (int)FLOORF((float)sample_index * sample_column_width);
         // waveform.glsl#L13 float sample_x = (sample_index + 0.5) / total_waveform_buffer_size_in_samples;
         int sample_x_max = (int)FLOORF((float)(sample_index + 1) * sample_column_width);
-
-        if (sample_x_max <= sample_x_min) {
-            sample_x_max = sample_x_min + 1;
-        }
+        sample_x_max = MAXI(sample_x_max, sample_x_min + 1);
 
         float sample_value = analysis_window_samples[sample_index * sample_stride];
         float normalized_sample = 0.5f * (1.0f + sample_value);
@@ -48,10 +45,8 @@ static void render_waveform_frame(void) {
         line_y_min = CLAMP(line_y_min, 0, SCREEN_HEIGHT);
         line_y_max = CLAMP(line_y_max, 0, SCREEN_HEIGHT);
 
-        if (line_y_max > line_y_min) {
-            // waveform.glsl#L19 vec4 color = mix(BLACK, WHITE, line);
-            DrawRectangle(sample_x_min, line_y_min, sample_x_max - sample_x_min, line_y_max - line_y_min, WHITE);
-        }
+        // waveform.glsl#L19 vec4 color = mix(BLACK, WHITE, line);
+        DrawRectangle(sample_x_min, line_y_min, sample_x_max - sample_x_min, line_y_max - line_y_min, WHITE);
     }
 }
 
@@ -63,9 +58,7 @@ int main(void) {
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
     load_audio_tracks();
-    // set_audio_track(DEFAULT_AUDIO_TRACK_KREUZSCHMERZEN_RENT_DUE);
-    // set_audio_track(DEFAULT_AUDIO_TRACK_KREUZSCHMERZEN);
-    set_audio_track(DEFAULT_AUDIO_TRACK_SHADERTOY_EXPERIMENT);
+    set_audio_track(SHADERTOY_EXPERIMENT);
     audio_stream = LoadAudioStream(SRC_SAMPLE_RATE, SRC_BIT_DEPTH, SRC_CHANNELS);
     PlayAudioStream(audio_stream);
 
@@ -76,6 +69,7 @@ int main(void) {
             break;
         }
 
+        update_audio_track_cycle();
         if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT)) {
             reset_sticky_nav();
             if (!is_paused) {
@@ -114,7 +108,6 @@ int main(void) {
                 analysis_window_samples[i] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
             }
         }
-
         while (!is_paused && IsAudioStreamProcessed(audio_stream)) {
             for (int i = 0; i < AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES; i++) {
                 chunk_samples[i] = wave_pcm16[wave_cursor];
@@ -130,7 +123,6 @@ int main(void) {
             }
         }
 
-        update_audio_track_cycle();
         BeginDrawing();
         ClearBackground(BLACK);
         // TODO: BELOW IS FOR EXPERIMENTING WITH DIFFERENT DRAW TYPES

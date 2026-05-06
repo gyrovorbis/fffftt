@@ -16,9 +16,7 @@ int main(void) {
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
     load_audio_tracks();
-    // set_audio_track(DEFAULT_AUDIO_TRACK_KREUZSCHMERZEN_RENT_DUE);
-    // set_audio_track(DEFAULT_AUDIO_TRACK_KREUZSCHMERZEN);
-    set_audio_track(DEFAULT_AUDIO_TRACK_SHADERTOY_EXPERIMENT);
+    set_audio_track(SHADERTOY_EXPERIMENT);
     audio_stream = LoadAudioStream(SRC_SAMPLE_RATE, SRC_BIT_DEPTH, SRC_CHANNELS);
     PlayAudioStream(audio_stream);
 
@@ -29,6 +27,7 @@ int main(void) {
             break;
         }
 
+        update_audio_track_cycle();
         update_playback_controls_sound_envelope();
         while (!is_paused && IsAudioStreamProcessed(audio_stream)) {
             for (int i = 0; i < AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES; i++) {
@@ -48,7 +47,6 @@ int main(void) {
         }
 
         update_envelope_mesh_vertices_isometric(&envelope_mesh_vertices[0][0]);
-        update_audio_track_cycle();
 
         BeginDrawing();
         ClearBackground(BLACK);
