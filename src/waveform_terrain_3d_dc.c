@@ -58,7 +58,6 @@ int main(void) {
 
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-    load_audio_tracks();
     set_audio_track(SHADERTOY_EXPERIMENT);
     audio_stream = LoadAudioStream(SRC_SAMPLE_RATE, SRC_BIT_DEPTH, SRC_CHANNELS);
     PlayAudioStream(audio_stream);
@@ -115,20 +114,7 @@ int main(void) {
         update_playback_controls_waveform();
 
         int audio_dirty = 0;
-        while (!is_paused && IsAudioStreamProcessed(audio_stream)) {
-            for (int i = 0; i < AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES; i++) {
-                chunk_samples[i] = wave_pcm16[wave_cursor];
-                if (++wave_cursor >= wave.frameCount) {
-                    wave_cursor = 0;
-                }
-            }
-
-            UpdateAudioStream(audio_stream, chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-
-            for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                analysis_window_samples[i] = (float)chunk_samples[i] / ANALYSIS_PCM16_UPPER_BOUND;
-            }
-
+        while (fffftt_audio_process(chunk_samples)) {
             advance_lane_history(&lane_point_values[0][0], LANE_POINT_COUNT);
             advance_lane_history(&hilbert_normal_field[0][0], LANE_POINT_COUNT);
             advance_lane_history(&rms_color_field[0][0], LANE_POINT_COUNT);
@@ -166,7 +152,7 @@ int main(void) {
         glLightfv(GL_LIGHT0, GL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
         glLightfv(GL_LIGHT0, GL_DIFFUSE, light0_diffuse);
         glLightfv(GL_LIGHT0, GL_POSITION, (const GLfloat[]){light0_pos.x, light0_pos.y, light0_pos.z, 1.0f});
-        DrawModelEx(model_a, MIDDLE, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
+        DrawModelEx(model_a, MIDDLE, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE); //TODO: too powerful...
         glDisable(GL_LIGHTING);
         draw_lantern(light0_pos);
         draw_lantern_glow(light0_pos);
@@ -188,7 +174,7 @@ int main(void) {
         glLightfv(GL_LIGHT0, GL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
         glLightfv(GL_LIGHT0, GL_DIFFUSE, (const GLfloat[]){1.0f, 1.0f, 1.0f, 1.0f});
         glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, (const GLfloat[]){0.0f, 0.0f, 0.0f, 0.0f});
-        DrawModelEx(flat_model, TOP, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
+        DrawModelEx(flat_model, TOP, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE); //TODO: too powerful...
         glShadeModel(GL_SMOOTH);
         glDisable(GL_LIGHTING);
 
@@ -203,6 +189,12 @@ int main(void) {
         EndMode3D();
         DrawTextEx(font, TextFormat("%2i FPS", GetFPS()), (Vector2){50.0f, 440.0f}, FONT_SIZE, 0.0f, WHITE);
         draw_playback_inspection_hud();
+        DrawTextEx(font,
+                   TextFormat("TRACK [%d/%d]: %s", audio_track_index, AUDIO_TRACK_COUNT - 1, AUDIO_TRACK_PATH(audio_track_index)),
+                   (Vector2){7.0f + 20.0f, 25.0f + FONT_SIZE},
+                   FONT_SIZE,
+                   0.0f,
+                   MARINER);
         EndDrawing();
     }
 
@@ -212,7 +204,7 @@ int main(void) {
     UnloadModel(model_b);
     UnloadModel(flat_model);
     UnloadAudioStream(audio_stream);
-    unload_audio_tracks();
+    unload_audio_track();
     CloseAudioDevice();
     UnloadFont(font);
     CloseWindow();
@@ -436,9 +428,7 @@ static Color sample_rms_palette(float rms) {
 }
 
 static void build_waveform_terrain_lane_from_cursor(int lane, int cursor) {
-    for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-        analysis_window_samples[i] = (float)wave_pcm16[(cursor + i) % wave.frameCount] / ANALYSIS_PCM16_UPPER_BOUND;
-    }
+    fffftt_inspection_fill_analysis_window(cursor);
 
     for (int i = 0; i < LANE_POINT_COUNT; i++) {
         lane_point_values[lane][i] = analysis_window_samples[(i * (ANALYSIS_WINDOW_SIZE_IN_FRAMES - 1)) / (LANE_POINT_COUNT - 1)];
@@ -498,8 +488,8 @@ static void inspection_step(int dir) {
     }
 
     const int target_lane = (dir == FORWARD) ? 0 : LANE_COUNT - 1;
-    const int back_lane_offset = ((LANE_COUNT - 1) * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
-    const int target_cursor = (dir == FORWARD) ? wave_cursor : (wave_cursor + wave.frameCount - back_lane_offset) % wave.frameCount;
+    const int back_lane_offset = WRAP((LANE_COUNT - 1) * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
+    const int target_cursor = (dir == FORWARD) ? wave_cursor : WRAP_MINUS(wave_cursor, back_lane_offset, wave.frameCount);
     build_waveform_terrain_lane_from_cursor(target_lane, target_cursor);
     recompute_waveform_onset();
 }
@@ -515,7 +505,7 @@ static void rebase_waveform_history(void) {
     adaptive_waveform_onset_power_ready = 0;
 
     for (int i = 0; i < LANE_COUNT; i++) {
-        int lane_cursor = (wave_cursor + wave.frameCount - ((i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount)) % wave.frameCount;
+        int lane_cursor = WRAP_MINUS(wave_cursor, i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
         build_waveform_terrain_lane_from_cursor(i, lane_cursor);
     }
 
@@ -556,15 +546,10 @@ static void update_playback_controls_waveform(void) {
         reset_sticky_nav();
         if (!is_paused) {
             is_paused = true;
-            wave_cursor = (wave_cursor + wave.frameCount - AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+            wave_cursor = WRAP_MINUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
             paused_wave_cursor = wave_cursor;
             seek_delta_chunks = 0;
-            for (int i = 0; i < MAX_DRAIN_CHUNK_COUNT; i++) {
-                while (!IsAudioStreamProcessed(audio_stream)) {
-                    /* KEEP DRAINING! */
-                }
-                UpdateAudioStream(audio_stream, drain_chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-            }
+            fffftt_audio_drain();
             PauseAudioStream(audio_stream);
             rebase_waveform_history();
             update_waveform_terrain_meshes();
@@ -572,19 +557,7 @@ static void update_playback_controls_waveform(void) {
             is_paused = false;
             inspection_ready = 0;
             PlayAudioStream(audio_stream);
-            while (IsAudioStreamProcessed(audio_stream)) {
-                for (int i = 0; i < AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES; i++) {
-                    resume_chunk_samples[i] = wave_pcm16[wave_cursor];
-                    if (++wave_cursor >= wave.frameCount) {
-                        wave_cursor = 0;
-                    }
-                }
-                UpdateAudioStream(audio_stream, resume_chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-
-                for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                    analysis_window_samples[i] = (float)resume_chunk_samples[i] / ANALYSIS_PCM16_UPPER_BOUND;
-                }
-
+            while (fffftt_audio_process(resume_chunk_samples)) {
                 advance_lane_history(&lane_point_values[0][0], LANE_POINT_COUNT);
                 advance_lane_history(&hilbert_normal_field[0][0], LANE_POINT_COUNT);
                 advance_lane_history(&rms_color_field[0][0], LANE_POINT_COUNT);
@@ -600,7 +573,7 @@ static void update_playback_controls_waveform(void) {
     }
 
     if (is_paused && sticky_nav(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
-        wave_cursor = (wave_cursor + wave.frameCount - AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+        wave_cursor = WRAP_MINUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
         seek_delta_chunks--;
         if (inspection_ready) {
             inspection_step(BACKWARD);
@@ -609,7 +582,7 @@ static void update_playback_controls_waveform(void) {
         }
         update_waveform_terrain_meshes();
     } else if (is_paused && sticky_nav(GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
-        wave_cursor = (wave_cursor + AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+        wave_cursor = WRAP_PLUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
         seek_delta_chunks++;
         if (inspection_ready) {
             inspection_step(FORWARD);

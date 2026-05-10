@@ -132,7 +132,6 @@ int main(void) {
 
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-    load_audio_tracks();
     set_audio_track(SHADERTOY_EXPERIMENT);
     audio_stream = LoadAudioStream(SRC_SAMPLE_RATE, SRC_BIT_DEPTH, SRC_CHANNELS);
     PlayAudioStream(audio_stream);
@@ -205,20 +204,7 @@ int main(void) {
         update_playback_controls_fft();
 
         int audio_dirty = 0;
-        while (!is_paused && IsAudioStreamProcessed(audio_stream)) {
-            for (int i = 0; i < AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES; i++) {
-                chunk_samples[i] = wave_pcm16[wave_cursor];
-                if (++wave_cursor >= wave.frameCount) {
-                    wave_cursor = 0;
-                }
-            }
-
-            UpdateAudioStream(audio_stream, chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-
-            for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                analysis_window_samples[i] = (float)chunk_samples[i] / ANALYSIS_PCM16_UPPER_BOUND;
-            }
-
+        while (fffftt_audio_process(chunk_samples)) {
             apply_blackman_window();
             shz_fft((shz_complex_t*)fft_data.work_buffer, (size_t)ANALYSIS_WINDOW_SIZE_IN_FRAMES);
             build_spectrum();
@@ -270,7 +256,7 @@ int main(void) {
         glLightfv(GL_LIGHT0, GL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
         glLightfv(GL_LIGHT0, GL_DIFFUSE, light0_diffuse);
         glLightfv(GL_LIGHT0, GL_POSITION, (const GLfloat[]){light0_pos.x, light0_pos.y, light0_pos.z, 1.0f});
-        DrawModelEx(low_band_model, LOW_BAND_ANCHOR, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
+        DrawModelEx(low_band_model, LOW_BAND_ANCHOR, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE); //TODO: too powerful...
         glDisable(GL_LIGHTING);
         draw_lantern(light0_pos);
         draw_lantern_glow(light0_pos);
@@ -281,7 +267,7 @@ int main(void) {
         glLightfv(GL_LIGHT0, GL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
         glLightfv(GL_LIGHT0, GL_DIFFUSE, (const GLfloat[]){1.0f, 1.0f, 1.0f, 1.0f});
         glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, (const GLfloat[]){0.0f, 0.0f, 0.0f, 0.0f});
-        DrawModelEx(flat_model, MID_BAND_ANCHOR, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
+        DrawModelEx(flat_model, MID_BAND_ANCHOR, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE); //TODO: too powerful...
         glShadeModel(GL_SMOOTH);
         glDisable(GL_LIGHTING);
 
@@ -304,6 +290,12 @@ int main(void) {
         EndMode3D();
         DrawTextEx(font, TextFormat("%2i FPS", GetFPS()), (Vector2){50.0f, 440.0f}, FONT_SIZE, 0.0f, WHITE);
         draw_playback_inspection_hud();
+        DrawTextEx(font,
+                   TextFormat("TRACK [%d/%d]: %s", audio_track_index, AUDIO_TRACK_COUNT - 1, AUDIO_TRACK_PATH(audio_track_index)),
+                   (Vector2){7.0f + 20.0f, 25.0f + FONT_SIZE},
+                   FONT_SIZE,
+                   0.0f,
+                   MARINER);
         EndDrawing();
     }
 
@@ -317,7 +309,7 @@ int main(void) {
     UnloadModel(high_band_model);
     UnloadModel(flat_model);
     UnloadAudioStream(audio_stream);
-    unload_audio_tracks();
+    unload_audio_track();
     CloseAudioDevice();
     RL_FREE(fft_data.raw_spectrum_magnitudes);
     RL_FREE(fft_data.spectrum_levels);
@@ -397,7 +389,7 @@ static void update_spectral_flatness_glitter_alpha(const float* raw_spectrum_mag
     gate = gate * gate * (3.0f - 2.0f * gate);
     float alpha_target = CLAMP(flatness * gate, 0.0f, 1.0f);
     spectral_flatness_glitter_alpha = alpha_target;
-    spectral_flatness_glitter_alpha_history[WRAP_HISTORY(fft_data.history_frame_pos - 1)] = spectral_flatness_glitter_alpha;
+    spectral_flatness_glitter_alpha_history[WRAP_MINUS(fft_data.history_frame_pos, 1, ANALYSIS_FFT_HISTORY_FRAME_COUNT)] = spectral_flatness_glitter_alpha;
     //TODO: and then do this for anticipating a distributed field from a 1D signal measurement... later...
     for (int i = 0; i < HIGH_BAND_VERTEX_COUNT; i++) {
         high_band_spectral_flatness_glitter_field[i] = spectral_flatness_glitter_alpha;
@@ -412,7 +404,7 @@ static void update_mesh_colors_spectral_flatness_glitter(Color* colors, const fl
 }
 
 static void consume_current_fft_frame(void) {
-    int cur_history_frame_pos = WRAP_HISTORY(fft_data.history_frame_pos - 1);
+    int cur_history_frame_pos = WRAP_MINUS(fft_data.history_frame_pos, 1, ANALYSIS_FFT_HISTORY_FRAME_COUNT);
     float* spectrum_levels = fft_data.spectrum_levels[cur_history_frame_pos];
     float* raw_spectrum_magnitudes = fft_data.raw_spectrum_magnitudes[cur_history_frame_pos];
     advance_lane_history(&low_band_lane_point_values[0][0], LOW_BAND_POINT_COUNT);
@@ -442,15 +434,10 @@ static void update_playback_controls_fft(void) {
         reset_sticky_nav();
         if (!is_paused) {
             is_paused = true;
-            wave_cursor = (wave_cursor + wave.frameCount - AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+            wave_cursor = WRAP_MINUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
             paused_wave_cursor = wave_cursor;
             seek_delta_chunks = 0;
-            for (int i = 0; i < MAX_DRAIN_CHUNK_COUNT; i++) {
-                while (!IsAudioStreamProcessed(audio_stream)) {
-                    /* KEEP DRAINING! */
-                }
-                UpdateAudioStream(audio_stream, drain_chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-            }
+            fffftt_audio_drain();
             PauseAudioStream(audio_stream);
             rebase_fft_history();
             update_fft_bands_terrain_meshes();
@@ -458,19 +445,7 @@ static void update_playback_controls_fft(void) {
             is_paused = false;
             inspection_ready = 0;
             PlayAudioStream(audio_stream);
-            while (IsAudioStreamProcessed(audio_stream)) {
-                for (int i = 0; i < AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES; i++) {
-                    resume_chunk_samples[i] = wave_pcm16[wave_cursor];
-                    if (++wave_cursor >= wave.frameCount) {
-                        wave_cursor = 0;
-                    }
-                }
-                UpdateAudioStream(audio_stream, resume_chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-
-                for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                    analysis_window_samples[i] = (float)resume_chunk_samples[i] / ANALYSIS_PCM16_UPPER_BOUND;
-                }
-
+            while (fffftt_audio_process(resume_chunk_samples)) {
                 apply_blackman_window();
                 shz_fft((shz_complex_t*)fft_data.work_buffer, (size_t)ANALYSIS_WINDOW_SIZE_IN_FRAMES);
                 build_spectrum();
@@ -481,7 +456,7 @@ static void update_playback_controls_fft(void) {
     }
 
     if (is_paused && sticky_nav(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
-        wave_cursor = (wave_cursor + wave.frameCount - AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+        wave_cursor = WRAP_MINUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
         seek_delta_chunks--;
         int target_frame_pos = cur_frame_pos - 1;
         if (inspection_ready && cur_frame_pos > 0 && target_frame_pos >= retention_window_min_frame_pos + (LANE_COUNT - 1)) {
@@ -490,7 +465,7 @@ static void update_playback_controls_fft(void) {
         } else {
             rebase_fft_history();
         }
-        int cur_history_frame_pos = WRAP_HISTORY(cur_frame_pos);
+        int cur_history_frame_pos = WRAP(cur_frame_pos, ANALYSIS_FFT_HISTORY_FRAME_COUNT);
         onset_gate = onset_gate_history[cur_history_frame_pos];
         spectral_flatness_glitter_alpha = spectral_flatness_glitter_alpha_history[cur_history_frame_pos];
         for (int i = 0; i < HIGH_BAND_VERTEX_COUNT; i++) {
@@ -498,17 +473,14 @@ static void update_playback_controls_fft(void) {
         }
         update_fft_bands_terrain_meshes();
     } else if (is_paused && sticky_nav(GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
-        wave_cursor = (wave_cursor + AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+        wave_cursor = WRAP_PLUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
         seek_delta_chunks++;
         int target_frame_pos = cur_frame_pos + 1;
         if (inspection_ready && target_frame_pos <= retention_window_max_frame_pos) {
             cur_frame_pos = target_frame_pos;
             inspection_step(FORWARD);
         } else if (inspection_ready && cur_frame_pos == retention_window_max_frame_pos) {
-            for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                int src = (wave_cursor + i) % wave.frameCount;
-                analysis_window_samples[i] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
-            }
+            fffftt_inspection_fill_analysis_window(wave_cursor);
 
             apply_blackman_window();
             shz_fft((shz_complex_t*)fft_data.work_buffer, (size_t)ANALYSIS_WINDOW_SIZE_IN_FRAMES);
@@ -516,7 +488,8 @@ static void update_playback_controls_fft(void) {
 
             int frame_pos = fft_data.frame_pos - 1;
             update_onset_gate_fft(&fft_data, 1);
-            update_spectral_flatness_glitter_alpha(fft_data.raw_spectrum_magnitudes[WRAP_HISTORY(fft_data.history_frame_pos - 1)]);
+            update_spectral_flatness_glitter_alpha(
+                fft_data.raw_spectrum_magnitudes[WRAP_MINUS(fft_data.history_frame_pos, 1, ANALYSIS_FFT_HISTORY_FRAME_COUNT)]);
             retention_window_max_frame_pos = frame_pos;
             if (retention_window_max_frame_pos - retention_window_min_frame_pos >= ANALYSIS_FFT_HISTORY_FRAME_COUNT) {
                 retention_window_min_frame_pos = retention_window_max_frame_pos - (ANALYSIS_FFT_HISTORY_FRAME_COUNT - 1);
@@ -526,7 +499,7 @@ static void update_playback_controls_fft(void) {
         } else {
             rebase_fft_history();
         }
-        int cur_history_frame_pos = WRAP_HISTORY(cur_frame_pos);
+        int cur_history_frame_pos = WRAP(cur_frame_pos, ANALYSIS_FFT_HISTORY_FRAME_COUNT);
         onset_gate = onset_gate_history[cur_history_frame_pos];
         spectral_flatness_glitter_alpha = spectral_flatness_glitter_alpha_history[cur_history_frame_pos];
         for (int i = 0; i < HIGH_BAND_VERTEX_COUNT; i++) {
@@ -550,7 +523,7 @@ static void build_fft_terrain_lane_from_frame_pos(int lane, int frame_pos) {
         return;
     }
 
-    int history_frame_pos = WRAP_HISTORY(frame_pos);
+    int history_frame_pos = WRAP(frame_pos, ANALYSIS_FFT_HISTORY_FRAME_COUNT);
     float* spectrum_levels = fft_data.spectrum_levels[history_frame_pos];
     float* raw_spectrum_magnitudes = fft_data.raw_spectrum_magnitudes[history_frame_pos];
     build_band_terrain(&low_band_lane_point_values[lane][0], LOW_BAND_POINT_COUNT, spectrum_levels, LOW_BAND_BIN_BOUNDS, NULL);
@@ -630,14 +603,9 @@ static void rebase_fft_history(void) {
     high_band_adaptive_peak = 0.0f;
 
     for (int i = ANALYSIS_FFT_HISTORY_FRAME_COUNT - 1; i >= 0; i--) {
-        int replay_frame_offset = (i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
-        int chunk_start_frame = (wave_cursor + wave.frameCount - replay_frame_offset) % wave.frameCount;
-
-        for (int j = 0; j < ANALYSIS_WINDOW_SIZE_IN_FRAMES; j++) {
-            int src = (chunk_start_frame + j) % wave.frameCount;
-            analysis_window_samples[j] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
-        }
-
+        int replay_frame_offset = WRAP(i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
+        int chunk_start_frame = WRAP_MINUS(wave_cursor, replay_frame_offset, wave.frameCount);
+        fffftt_inspection_fill_analysis_window(chunk_start_frame);
         apply_blackman_window();
         shz_fft((shz_complex_t*)fft_data.work_buffer, (size_t)ANALYSIS_WINDOW_SIZE_IN_FRAMES);
         build_spectrum();
@@ -648,7 +616,7 @@ static void rebase_fft_history(void) {
     retention_window_max_frame_pos = fft_data.frame_pos - 1;
     retention_window_min_frame_pos = retention_window_max_frame_pos - (ANALYSIS_FFT_HISTORY_FRAME_COUNT - 1);
     cur_frame_pos = retention_window_max_frame_pos;
-    int cur_history_frame_pos = WRAP_HISTORY(cur_frame_pos);
+    int cur_history_frame_pos = WRAP(cur_frame_pos, ANALYSIS_FFT_HISTORY_FRAME_COUNT);
     onset_gate = onset_gate_history[cur_history_frame_pos];
     spectral_flatness_glitter_alpha = spectral_flatness_glitter_alpha_history[cur_history_frame_pos];
     for (int i = 0; i < HIGH_BAND_VERTEX_COUNT; i++) {

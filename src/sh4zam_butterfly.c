@@ -5,7 +5,7 @@ static const char* domain = "SH4ZAM-BUTTERFLY";
 static inline void render_fft_frame(void) {
     float frames_since_tapback = FLOORF(fft_data.tapback_pos / ((float)ANALYSIS_WINDOW_SIZE_IN_FRAMES / (float)ANALYSIS_SAMPLE_RATE));
     frames_since_tapback = CLAMP(frames_since_tapback, 0.0f, (float)(ANALYSIS_FFT_HISTORY_FRAME_COUNT - 1));
-    int cur_history_frame_pos = WRAP_HISTORY(fft_data.history_frame_pos - 1 - (int)frames_since_tapback);
+    int cur_history_frame_pos = WRAP_MINUS(fft_data.history_frame_pos, 1 + (int)frames_since_tapback, ANALYSIS_FFT_HISTORY_FRAME_COUNT);
     float* spectrum_levels = fft_data.spectrum_levels[cur_history_frame_pos];
 
     float cell_width = (float)SCREEN_WIDTH / (float)ANALYSIS_SPECTRUM_BIN_COUNT;    // fft.glsl#L19 float cellWidth = iResolution.x / NUM_OF_BINS;
@@ -36,7 +36,6 @@ int main(void) {
 
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-    load_audio_tracks();
     set_audio_track(SHADERTOY_EXPERIMENT);
     audio_stream = LoadAudioStream(SRC_SAMPLE_RATE, SRC_BIT_DEPTH, SRC_CHANNELS);
     PlayAudioStream(audio_stream);
@@ -51,19 +50,7 @@ int main(void) {
         update_audio_track_cycle();
         update_playback_controls_fft_spectrum();
 
-        while (!is_paused && IsAudioStreamProcessed(audio_stream)) {
-            for (int i = 0; i < AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES; i++) {
-                chunk_samples[i] = wave_pcm16[wave_cursor];
-                if (++wave_cursor >= wave.frameCount) {
-                    wave_cursor = 0;
-                }
-            }
-
-            UpdateAudioStream(audio_stream, chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-
-            for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                analysis_window_samples[i] = (float)chunk_samples[i] / ANALYSIS_PCM16_UPPER_BOUND;
-            }
+        while (fffftt_audio_process(chunk_samples)) {
         }
 
         apply_blackman_window();
@@ -79,11 +66,17 @@ int main(void) {
         render_fft_frame();
         draw_playback_inspection_hud();
         DrawTextEx(font, TextFormat("%2i FPS", GetFPS()), (Vector2){50.0f, 440.0f}, FONT_SIZE, 0.0f, WHITE);
+        DrawTextEx(font,
+                   TextFormat("TRACK [%d/%d]: %s", audio_track_index, AUDIO_TRACK_COUNT - 1, AUDIO_TRACK_PATH(audio_track_index)),
+                   (Vector2){7.0f + 20.0f, 25.0f + FONT_SIZE},
+                   FONT_SIZE,
+                   0.0f,
+                   MARINER);
         EndDrawing();
     }
 
     UnloadAudioStream(audio_stream);
-    unload_audio_tracks();
+    unload_audio_track();
     CloseAudioDevice();
     RL_FREE(fft_data.raw_spectrum_magnitudes);
     RL_FREE(fft_data.spectrum_levels);

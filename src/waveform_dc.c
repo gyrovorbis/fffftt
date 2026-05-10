@@ -57,7 +57,6 @@ int main(void) {
 
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-    load_audio_tracks();
     set_audio_track(SHADERTOY_EXPERIMENT);
     audio_stream = LoadAudioStream(SRC_SAMPLE_RATE, SRC_BIT_DEPTH, SRC_CHANNELS);
     PlayAudioStream(audio_stream);
@@ -72,55 +71,33 @@ int main(void) {
         update_audio_track_cycle();
         if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT)) {
             reset_sticky_nav();
+
             if (!is_paused) {
                 is_paused = true;
-                wave_cursor = (wave_cursor + wave.frameCount - AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+                wave_cursor = WRAP_MINUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
                 paused_wave_cursor = wave_cursor;
                 seek_delta_chunks = 0;
-                for (int i = 0; i < MAX_DRAIN_CHUNK_COUNT; i++) {
-                    while (!IsAudioStreamProcessed(audio_stream)) {
-                        /* KEEP DRAINING! */
-                    }
-                    UpdateAudioStream(audio_stream, drain_chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-                }
+
+                fffftt_audio_drain();
                 PauseAudioStream(audio_stream);
-                for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                    int src = (wave_cursor + i) % wave.frameCount;
-                    analysis_window_samples[i] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
-                }
+                fffftt_inspection_fill_analysis_window(wave_cursor);
             } else {
                 is_paused = false;
                 PlayAudioStream(audio_stream);
             }
         }
+
         if (is_paused && sticky_nav(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
-            wave_cursor = (wave_cursor + wave.frameCount - AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+            wave_cursor = WRAP_MINUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
             seek_delta_chunks--;
-            for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                int src = (wave_cursor + i) % wave.frameCount;
-                analysis_window_samples[i] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
-            }
+            fffftt_inspection_fill_analysis_window(wave_cursor);
         } else if (is_paused && sticky_nav(GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
-            wave_cursor = (wave_cursor + AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+            wave_cursor = WRAP_PLUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
             seek_delta_chunks++;
-            for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                int src = (wave_cursor + i) % wave.frameCount;
-                analysis_window_samples[i] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
-            }
+            fffftt_inspection_fill_analysis_window(wave_cursor);
         }
-        while (!is_paused && IsAudioStreamProcessed(audio_stream)) {
-            for (int i = 0; i < AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES; i++) {
-                chunk_samples[i] = wave_pcm16[wave_cursor];
-                if (++wave_cursor >= wave.frameCount) {
-                    wave_cursor = 0;
-                }
-            }
 
-            UpdateAudioStream(audio_stream, chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-
-            for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                analysis_window_samples[i] = (float)chunk_samples[i] / ANALYSIS_PCM16_UPPER_BOUND;
-            }
+        while (fffftt_audio_process(chunk_samples)) {
         }
 
         BeginDrawing();
@@ -140,11 +117,17 @@ int main(void) {
         // glDrawArrays(GL_POINTS, 0, ANALYSIS_WAVEFORM_SAMPLE_COUNT);
         draw_playback_inspection_hud();
         DrawTextEx(font, TextFormat("%2i FPS", GetFPS()), (Vector2){50.0f, 440.0f}, FONT_SIZE, 0.0f, WHITE);
+        DrawTextEx(font,
+                   TextFormat("TRACK [%d/%d]: %s", audio_track_index, AUDIO_TRACK_COUNT - 1, AUDIO_TRACK_PATH(audio_track_index)),
+                   (Vector2){7.0f + 20.0f, 25.0f + FONT_SIZE},
+                   FONT_SIZE,
+                   0.0f,
+                   MARINER);
         EndDrawing();
     }
 
     UnloadAudioStream(audio_stream);
-    unload_audio_tracks();
+    unload_audio_track();
     CloseAudioDevice();
     UnloadFont(font);
     CloseWindow();

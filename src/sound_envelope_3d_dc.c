@@ -15,7 +15,6 @@ int main(void) {
 
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-    load_audio_tracks();
     set_audio_track(SHADERTOY_EXPERIMENT);
     audio_stream = LoadAudioStream(SRC_SAMPLE_RATE, SRC_BIT_DEPTH, SRC_CHANNELS);
     PlayAudioStream(audio_stream);
@@ -37,19 +36,7 @@ int main(void) {
 
         update_audio_track_cycle();
         update_playback_controls_sound_envelope();
-        while (!is_paused && IsAudioStreamProcessed(audio_stream)) {
-            for (int i = 0; i < AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES; i++) {
-                chunk_samples[i] = wave_pcm16[wave_cursor];
-                if (++wave_cursor >= wave.frameCount) {
-                    wave_cursor = 0;
-                }
-            }
-
-            UpdateAudioStream(audio_stream, chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-
-            for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                analysis_window_samples[i] = (float)chunk_samples[i] / ANALYSIS_PCM16_UPPER_BOUND;
-            }
+        while (fffftt_audio_process(chunk_samples)) {
             advance_lane_history(&lane_point_values[0][0], LANE_POINT_COUNT);
             smooth_lane(0);
         }
@@ -84,12 +71,9 @@ int main(void) {
                 float target_z = ((marker_lane_index < 0) ? envelope_mesh_vertices[0][0].z : envelope_mesh_vertices[LANE_COUNT - 1][0].z) + outside_shift_z;
 
                 for (int i = 0; i < LANE_POINT_COUNT; i++) {
-                    float sample_sum = 0.0f;
                     int sample_index = i * WAVEFORM_SAMPLES_PER_LANE_POINT;
-                    for (int j = 0; j < WAVEFORM_SAMPLES_PER_LANE_POINT; j++) {
-                        int src = (paused_wave_cursor + sample_index + j) % wave.frameCount;
-                        sample_sum += FABSF((float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND);
-                    }
+                    int sample_cursor = WRAP_PLUS(wave_cursor, sample_index, wave.frameCount);
+                    float sample_sum = fffftt_accumulate_sound_envelope(sample_cursor, WAVEFORM_SAMPLES_PER_LANE_POINT);
                     paused_lane_point_values[i] = (sample_sum / (float)WAVEFORM_SAMPLES_PER_LANE_POINT) * FRONT_LANE_SMOOTHING;
                 }
 
@@ -119,11 +103,17 @@ int main(void) {
         EndMode3D();
         draw_playback_inspection_hud();
         DrawTextEx(font, TextFormat("%2i FPS", GetFPS()), (Vector2){50.0f, 440.0f}, FONT_SIZE, 0.0f, WHITE);
+        DrawTextEx(font,
+                   TextFormat("TRACK [%d/%d]: %s", audio_track_index, AUDIO_TRACK_COUNT - 1, AUDIO_TRACK_PATH(audio_track_index)),
+                   (Vector2){7.0f + 20.0f, 25.0f + FONT_SIZE},
+                   FONT_SIZE,
+                   0.0f,
+                   MARINER);
         EndDrawing();
     }
 
     UnloadAudioStream(audio_stream);
-    unload_audio_tracks();
+    unload_audio_track();
     CloseAudioDevice();
     UnloadFont(font);
     CloseWindow();

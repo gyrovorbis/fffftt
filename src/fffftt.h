@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dc/perfctr.h>
+#include <kos/fs.h>
+#include <fcntl.h>
 
 //TODO: investigate orbital camera!!!!
 #define SINF(x) shz_sinf((x))
@@ -35,7 +37,18 @@
 #define LERP(a, b, t) shz_lerpf((a), (b), (t))
 #define MAXI(x, y) ((x) > (y) ? (x) : (y))
 #define MINI(x, y) ((x) < (y) ? (x) : (y))
-#define WRAP_HISTORY(frame) (((frame) + ANALYSIS_FFT_HISTORY_FRAME_COUNT) % ANALYSIS_FFT_HISTORY_FRAME_COUNT)
+#define WRAP(pos, size)                                                                                                                                        \
+    ({                                                                                                                                                         \
+        int p_ = (pos);                                                                                                                                        \
+        int s_ = (size);                                                                                                                                       \
+        int w_ = p_ % s_;                                                                                                                                      \
+        (w_ < 0) ? w_ + s_ : w_;                                                                                                                               \
+    })
+
+#define WRAP_PLUS(pos, amount, size) WRAP((pos) + (amount), (size))
+#define WRAP_MINUS(pos, amount, size) WRAP((pos) - (amount), (size))
+#define WRAP_OFFSET(start, pos, size) WRAP((pos) - (start), (size))
+#define FRAMES_TILL_NEXT_WRAP(pos, size) ((size) - (pos))
 
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
@@ -95,32 +108,23 @@
 #define Y_AXIS (Vector3){0.0f, 1.0f, 0.0f}
 #define DEFAULT_SCALE (Vector3){1.0f, 1.0f, 1.0f}
 
-#define RD_COUNTRY_22K_WAV "/rd/country_22050hz_pcm16_mono.wav"
-
-#define RD_KREUZSCHMERZEN_YOU_KNOW_WHY_22K_WAV "/rd/kreuzschmerzen_you_know_why_22050hz_pcm16_mono.wav"
-#define RD_KREUZSCHMERZEN_RENT_DUE_22K_WAV "/rd/kreuzschmerzen_rent_due_22050hz_pcm16_mono.wav"
-
 #define RD_SHADERTOY_EXPERIMENT_22K_WAV "/rd/shadertoy_experiment_22050hz_pcm16_mono.wav"
 #define RD_SHADERTOY_ELECTRONEBULAE_22K_WAV "/rd/shadertoy_electronebulae_22050hz_pcm16_mono.wav"
-#define RD_SHADERTOY_8BIT_22K_WAV "/rd/shadertoy_8bit_22050hz_pcm16_mono.wav"
-#define RD_SHADERTOY_GEOMETRIC_PERSON_22K_WAV "/rd/shadertoy_geometric_person_22050hz_pcm16_mono.wav"
-#define RD_SHADERTOY_TROPICAL_22K_WAV "/rd/shadertoy_tropical_22050hz_pcm16_mono.wav"
-#define RD_SHADERTOY_XTRACK_22K_WAV "/rd/shadertoy_xtrack_22050hz_pcm16_mono.wav"
 
-#define RD_DDS_FFM_22K_WAV "/rd/dds_ffm_22050hz_pcm16_mono.wav"
-#define RD_DDS_FFM_FULL_22K_WAV "/rd/dds_ffm_full_22050hz_pcm16_mono.wav"
-
-#define RD_RAMA_22K_WAV "/rd/rama_22050hz_pcm16_mono.wav"
-#define RD_RAMA_FULL_22K_WAV "/rd/rama_full_22050hz_pcm16_mono.wav"
-
-#define RD_CT_LOR_22K_WAV "/rd/ct_lor_22050hz_pcm16_mono.wav"
-#define RD_CT_LOR_FULL_22K_WAV "/rd/ct_lor_full_22050hz_pcm16_mono.wav"
-
-#define RD_AT_UNTITLED_22K_WAV "/rd/at_untitled_22050hz_pcm16_mono.wav"
-#define RD_AT_UNTITLED_FULL_22K_WAV "/rd/at_untitled_full_22050hz_pcm16_mono.wav"
-
-#define RD_TJ_SAYO_22K_WAV "/rd/tj_sayo_22050hz_pcm16_mono.wav"
-#define RD_TJ_SAYO_FULL_22K_WAV "/rd/tj_sayo_full_22050hz_pcm16_mono.wav"
+#define SHADERTOY_EXPERIMENT_22K_WAV "/pc/experiment.wav"
+#define SHADERTOY_ELECTRONEBULAE_22K_WAV "/pc/electronebulae.wav"
+#define SHADERTOY_8BIT_22K_WAV "/pc/8bit.wav"
+#define SHADERTOY_GEOMETRIC_PERSON_22K_WAV "/pc/geometric_person.wav"
+#define SHADERTOY_TROPICAL_22K_WAV "/pc/tropical.wav"
+#define SHADERTOY_XTRACK_22K_WAV "/pc/xtrack.wav"
+#define KREUZSCHMERZEN_YOU_KNOW_WHY_FULL_22K_WAV "/pc/kreuz.wav"
+#define M4_TBH_FULL_22K_WAV "/pc/m4_tbh.wav"
+#define MG_NO_MONEY_FULL_22K_WAV "/pc/mg.wav"
+#define DDS_FFM_FULL_22K_WAV "/pc/dds_ffm.wav"
+#define RAMA_FULL_22K_WAV "/pc/rama.wav"
+#define CT_LOR_FULL_22K_WAV "/pc/ct_lor.wav"
+#define AT_UNTITLED_FULL_22K_WAV "/pc/at.wav"
+#define TJ_SAYO_FULL_22K_WAV "/pc/tj_sayo.wav"
 
 #define RD_FONT "/rd/vga_rom_f16_0px_TIGHT.fnt" //TODO: nice 1KB...
 #define FONT_SIZE 16.0f
@@ -229,9 +233,10 @@ static inline float elapsed_milliseconds(uint64_t start_ns) {
 static AudioStream audio_stream = {0};
 static Wave wave = {0};
 static int wave_cursor = 0;
-static int16_t* wave_pcm16 = NULL;
 static FFTData fft_data = {0};
 static float analysis_window_samples[ANALYSIS_WINDOW_SIZE_IN_FRAMES] = {0};
+static int16_t analysis_pcm16[ANALYSIS_WINDOW_SIZE_IN_FRAMES] = {0};
+
 // TODO: current stupid trick for draining my understanding of the worst case scenario: mid-stream pause/resume of raylib/miniaudio stream + AICA buffer
 #define MAX_DRAIN_CHUNK_COUNT 3
 static int16_t drain_chunk_samples[AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES] = {0};
@@ -293,7 +298,7 @@ static inline void build_spectrum(void) {
         update_smoothing_and_spectrum_levels_bin(spectrum_levels, i, re, im);
     }
 
-    fft_data.history_frame_pos = WRAP_HISTORY(fft_data.history_frame_pos + 1);
+    fft_data.history_frame_pos = WRAP_PLUS(fft_data.history_frame_pos, 1, ANALYSIS_FFT_HISTORY_FRAME_COUNT);
     fft_data.frame_pos++;
 }
 
@@ -668,40 +673,17 @@ static inline void reset_shared_adaptive_audio_state(void) {
     adaptive_chroma_mask_ready = 0;
 }
 
-static inline void rebase_fft_spectrum_history_at_wave_cursor(void) {
-    MEMSET(fft_data.smoothed_spectrum_magnitudes, 0, sizeof(float) * ANALYSIS_SPECTRUM_BIN_COUNT);
-    MEMSET(fft_data.raw_spectrum_magnitudes, 0, sizeof(float[ANALYSIS_SPECTRUM_BIN_COUNT]) * ANALYSIS_FFT_HISTORY_FRAME_COUNT);
-    MEMSET(fft_data.spectrum_levels, 0, sizeof(float[ANALYSIS_SPECTRUM_BIN_COUNT]) * ANALYSIS_FFT_HISTORY_FRAME_COUNT);
-    fft_data.history_frame_pos = 0;
-    fft_data.frame_pos = 0;
-    reset_shared_adaptive_audio_state();
-
-    for (int i = ANALYSIS_FFT_HISTORY_FRAME_COUNT - 1; i >= 0; i--) {
-        int replay_frame_offset = (i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
-        int chunk_start_frame = (wave_cursor + wave.frameCount - replay_frame_offset) % wave.frameCount;
-
-        for (int j = 0; j < ANALYSIS_WINDOW_SIZE_IN_FRAMES; j++) {
-            int src = (chunk_start_frame + j) % wave.frameCount;
-            analysis_window_samples[j] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
-        }
-
-        apply_blackman_window();
-        shz_fft((shz_complex_t*)fft_data.work_buffer, (size_t)ANALYSIS_WINDOW_SIZE_IN_FRAMES);
-        build_spectrum();
-    }
-}
-
 static void update_onset_gate_fft(FFTData* fft_data, int use_raw) {
     // librosa onset_strength convention:
     // https://librosa.org/doc/main/generated/librosa.onset.onset_strength.html
     // TODO: onset_detect would be a later peak-pick stage is more complicated...
     // https://librosa.org/doc/main/generated/librosa.onset.onset_detect.html
-    int cur_history_frame_pos = WRAP_HISTORY(fft_data->history_frame_pos - 1);
+    int cur_history_frame_pos = WRAP_MINUS(fft_data->history_frame_pos, 1, ANALYSIS_FFT_HISTORY_FRAME_COUNT);
     if (fft_data->frame_pos <= ONSET_DELAY_FRAMES) {
         onset_gate_history[cur_history_frame_pos] = onset_gate;
         return;
     }
-    int delay_history_frame_pos = WRAP_HISTORY(fft_data->history_frame_pos - 1 - ONSET_DELAY_FRAMES);
+    int delay_history_frame_pos = WRAP_MINUS(fft_data->history_frame_pos, 1 + ONSET_DELAY_FRAMES, ANALYSIS_FFT_HISTORY_FRAME_COUNT);
     float* spectrum_levels = fft_data->spectrum_levels[cur_history_frame_pos];
     float* delay_spectrum_levels = fft_data->spectrum_levels[delay_history_frame_pos];
     float* raw_spectrum_magnitudes = fft_data->raw_spectrum_magnitudes[cur_history_frame_pos];
@@ -983,27 +965,368 @@ static inline int sticky_nav(int button) {
     return nav_flag;
 }
 
-static void rebase_smooth_envelope_at_wave_cursor(void) {
-    for (int i = 0; i < LANE_COUNT; i++) {
-        int start_frame = (wave_cursor + wave.frameCount - ((i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount)) % wave.frameCount;
-        for (int j = 0; j < ANALYSIS_WINDOW_SIZE_IN_FRAMES; j++) {
-            int src = (start_frame + j) % wave.frameCount;
-            analysis_window_samples[j] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
-        }
-        smooth_lane(i);
+#define YAMAHA_ADPCM_MIN_STEP_SIZE 127
+#define YAMAHA_ADPCM_MAX_STEP_SIZE 24576
+#define YAMAHA_ADPCM_READ_BUFFER_SIZE 2048
+#define ADPCM_CLAMP(value, min, max) ((int)CLAMP((float)(value), (float)(min), (float)(max)))
+#define ADPCM_CLAMP_PCM16(value) ((int16_t)ADPCM_CLAMP((value), INT16_MIN, INT16_MAX))
+#define ADPCM_CLAMP_STEP_SIZE(value) ((int16_t)ADPCM_CLAMP((value), YAMAHA_ADPCM_MIN_STEP_SIZE, YAMAHA_ADPCM_MAX_STEP_SIZE))
+static const int YAMAHA_ADPCM_STEP_TABLE[8] = {230, 230, 230, 230, 307, 409, 512, 614};
+
+static int src_file = 0;
+static int src_file_data_offset = 0;
+static int src_file_chunk_size = 0;
+static int src_file_fact_frame_count = 0;
+static int src_file_format_tag = 0;
+static int adpcm_decode_frame = 0;
+static int16_t adpcm_decode_history = 0;
+static int16_t adpcm_step_size = YAMAHA_ADPCM_MIN_STEP_SIZE;
+static unsigned char adpcm_read_buffer[YAMAHA_ADPCM_READ_BUFFER_SIZE] = {0};
+static int adpcm_start_pos = -1;
+static int adpcm_read_count = 0;
+static int adpcm_checkpoint_count = 0;
+static int adpcm_checkpoint_filled_count = 0;
+static int16_t* adpcm_checkpoint_history = NULL;
+static int16_t* adpcm_checkpoint_step_size = NULL;
+
+//TODO: double check this verbosity against any much more tight and canonical ways to do this. i dont want any paranoia please
+static inline int wav_probe_data_chunk(void) {
+    src_file_data_offset = 0;
+    src_file_chunk_size = 0;
+    src_file_fact_frame_count = 0;
+    src_file_format_tag = 0;
+    uint32_t header[3];
+    fs_seek(src_file, 0, SEEK_SET);
+    if (fs_read(src_file, header, 12) != 12) {
+        return 0;
     }
-    for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-        int src = (wave_cursor + i) % wave.frameCount;
-        analysis_window_samples[i] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
+    if (header[0] != 0x46464952 || header[2] != 0x45564157) {
+        return 0;
+    }
+    unsigned int file_size = (unsigned int)fs_total(src_file);
+    unsigned int pos = 12;
+    while (pos + 8 <= file_size) {
+        uint32_t chunk[2];
+        fs_seek(src_file, pos, SEEK_SET);
+        if (fs_read(src_file, chunk, 8) != 8) {
+            return 0;
+        }
+        int chunk_data_pos = pos + 8;
+        if (chunk_data_pos + chunk[1] > file_size) {
+            return 0;
+        }
+        if (chunk[0] == 0x20746D66) {
+            fs_seek(src_file, chunk_data_pos, SEEK_SET);
+            fs_read(src_file, &src_file_format_tag, sizeof(src_file_format_tag));
+        } else if (chunk[0] == 0x74636166) {
+            fs_seek(src_file, chunk_data_pos, SEEK_SET);
+            fs_read(src_file, &src_file_fact_frame_count, sizeof(src_file_fact_frame_count));
+        } else if (chunk[0] == 0x61746164) {
+            src_file_data_offset = chunk_data_pos;
+            src_file_chunk_size = chunk[1];
+        }
+        pos = chunk_data_pos + chunk[1] + (chunk[1] & 1);
+    }
+    return src_file_format_tag == 0x0020 && src_file_data_offset != 0 && src_file_chunk_size != 0;
+}
+
+// TODO: still hard to tell if zeroing and re-initing everything can even be centralized with how much state jgulling is happening now... oh dear
+static inline void reset_adpcm_decoder(void) {
+    adpcm_decode_frame = 0;
+    adpcm_decode_history = 0;
+    adpcm_step_size = YAMAHA_ADPCM_MIN_STEP_SIZE;
+    adpcm_start_pos = -1;
+    adpcm_read_count = 0;
+}
+
+static inline unsigned char adpcm_read_byte(int byte_index) {
+    if (byte_index < adpcm_start_pos || byte_index >= adpcm_start_pos + adpcm_read_count) {
+        fs_seek(src_file, src_file_data_offset + byte_index, SEEK_SET);
+        adpcm_start_pos = byte_index;
+        adpcm_read_count = fs_read(src_file, adpcm_read_buffer, YAMAHA_ADPCM_READ_BUFFER_SIZE);
+        if (adpcm_read_count <= 0) {
+            adpcm_start_pos = -1;
+            adpcm_read_count = 0;
+            return 0;
+        }
+    }
+    return adpcm_read_buffer[byte_index - adpcm_start_pos];
+}
+
+static inline int16_t adpcm_decode(unsigned char nibble) {
+    adpcm_decode_history = (int16_t)((adpcm_decode_history * 254) / 256);
+    int sign = nibble & 8;
+    int delta = nibble & 7;
+    int diff = ((1 + (delta << 1)) * adpcm_step_size) >> 3;
+    int sample = adpcm_decode_history + (sign ? -diff : diff);
+    int next_step_size = (YAMAHA_ADPCM_STEP_TABLE[delta] * adpcm_step_size) >> 8;
+    adpcm_decode_history = ADPCM_CLAMP_PCM16(sample);
+    adpcm_step_size = ADPCM_CLAMP_STEP_SIZE(next_step_size);
+    return adpcm_decode_history;
+}
+
+static inline void build_adpcm_checkpoints(void) {
+    adpcm_checkpoint_count = (wave.frameCount + AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES - 1) / AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES;
+    adpcm_checkpoint_filled_count = 1;
+    adpcm_checkpoint_history = RL_CALLOC(adpcm_checkpoint_count, sizeof(int16_t));
+    adpcm_checkpoint_step_size = RL_CALLOC(adpcm_checkpoint_count, sizeof(int16_t));
+    adpcm_checkpoint_history[0] = 0;
+    adpcm_checkpoint_step_size[0] = YAMAHA_ADPCM_MIN_STEP_SIZE;
+    reset_adpcm_decoder(); // TODO: again... clearly im not sure..
+}
+
+static inline void adpcm_save_checkpoint(void) {
+    if ((adpcm_decode_frame % AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) != 0) {
+        return;
+    }
+    int checkpoint_index = adpcm_decode_frame / AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES;
+    if (checkpoint_index >= adpcm_checkpoint_count) {
+        return;
+    }
+    adpcm_checkpoint_history[checkpoint_index] = adpcm_decode_history;
+    adpcm_checkpoint_step_size[checkpoint_index] = adpcm_step_size;
+    adpcm_checkpoint_filled_count = MAXI(adpcm_checkpoint_filled_count, checkpoint_index + 1);
+}
+
+static inline void fffftt_file_io_seek_read(int16_t* dst, int pos, int frame_count) {
+    int src_pos = WRAP(pos, wave.frameCount);
+    int write_count = 0;
+    while (write_count < frame_count) {
+        if (src_pos < adpcm_decode_frame) {
+            int checkpoint_index = src_pos / AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES;
+            checkpoint_index = MINI(checkpoint_index, adpcm_checkpoint_filled_count - 1);
+            adpcm_decode_frame = checkpoint_index * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES;
+            adpcm_decode_history = adpcm_checkpoint_history[checkpoint_index];
+            adpcm_step_size = adpcm_checkpoint_step_size[checkpoint_index];
+            adpcm_start_pos = -1;
+            adpcm_read_count = 0;
+        }
+        while (adpcm_decode_frame < src_pos) {
+            unsigned char byte = adpcm_read_byte(adpcm_decode_frame >> 1);
+            unsigned char nibble = (adpcm_decode_frame & 1) ? (unsigned char)(byte >> 4) : (unsigned char)(byte & 0x0F);
+            adpcm_decode(nibble);
+            adpcm_decode_frame++;
+            adpcm_save_checkpoint();
+        }
+        unsigned char byte = adpcm_read_byte(adpcm_decode_frame >> 1);
+        unsigned char nibble = (adpcm_decode_frame & 1) ? (unsigned char)(byte >> 4) : (unsigned char)(byte & 0x0F);
+        dst[write_count++] = adpcm_decode(nibble);
+        adpcm_decode_frame++;
+        adpcm_save_checkpoint();
+        src_pos = WRAP_PLUS(src_pos, 1, wave.frameCount);
     }
 }
 
-static Font font = {0};
+//TODO: this is synchronous and thus very poor with BBA transport, but i am interested in learning how to follow
+// through with this even if only for dev environment context, just to avoid fully resident wav_pcm, as a way to learn
+//  about adpcm and other tricks in dreamcast auduio domain... it feels very important to learn this stuff.
+static inline int fffftt_audio_process(int16_t* audio_period_pcm16) {
+    if (is_paused || !IsAudioStreamProcessed(audio_stream)) {
+        return 0;
+    }
+    fffftt_file_io_seek_read(audio_period_pcm16, wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
+    wave_cursor = WRAP_PLUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
+    UpdateAudioStream(audio_stream, audio_period_pcm16, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
+    for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
+        analysis_window_samples[i] = (float)audio_period_pcm16[i] / ANALYSIS_PCM16_UPPER_BOUND;
+    }
+    return 1;
+}
+
+static inline void fffftt_audio_drain(void) {
+    for (int i = 0; i < MAX_DRAIN_CHUNK_COUNT; i++) {
+        while (!IsAudioStreamProcessed(audio_stream)) {
+            /* KEEP DRAINING! */
+        }
+        UpdateAudioStream(audio_stream, drain_chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
+    }
+}
+
+static inline void fffftt_inspection_fill_analysis_window(int cursor) {
+    fffftt_file_io_seek_read(analysis_pcm16, cursor, ANALYSIS_WINDOW_SIZE_IN_FRAMES);
+    for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
+        analysis_window_samples[i] = (float)analysis_pcm16[i] / ANALYSIS_PCM16_UPPER_BOUND;
+    }
+}
+
+static inline float fffftt_accumulate_sound_envelope(int pos, int frame_count) {
+    int16_t envelope_pcm16[AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES];
+    int read_count = MINI(frame_count, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
+    fffftt_file_io_seek_read(envelope_pcm16, pos, read_count);
+
+    float sum = 0.0f;
+    for (int i = 0; i < read_count; i++) {
+        sum += FABSF((float)envelope_pcm16[i] / ANALYSIS_PCM16_UPPER_BOUND);
+    }
+    return sum;
+}
+
+#define FORWARD 1
+#define BACKWARD -1
+
+#define SHADERTOY_EXPERIMENT 0
+#define SHADERTOY_ELECTRONEBULAE 1
+#define AUDIO_TRACK_COUNT 2
+#define AUDIO_TRACK_PATH(track_index) ((track_index) == SHADERTOY_EXPERIMENT ? RD_SHADERTOY_EXPERIMENT_22K_WAV : RD_SHADERTOY_ELECTRONEBULAE_22K_WAV)
+
+// #define SHADERTOY_8BIT 2
+// #define SHADERTOY_GEOMETRIC_PERSON 3
+// #define SHADERTOY_TROPICAL 4
+// #define SHADERTOY_XTRACK 5
+// #define AUDIO_TRACK_COUNT 6
+
+// #define DDS_FFM 6
+// #define RAMA 7
+// #define CT_LOR 8
+// #define AT_UNTITLED 9
+// #define TJ_SAYO 10
+// #define KREUZSCHMERZEN_YOU_KNOW_WHY 11
+// #define M4_TBH 12
+// #define MG_NO_MONEY 13
+// #define AUDIO_TRACK_COUNT 14
+
+// #define AUDIO_TRACK_PATH(track_index)                                                                                                                          \
+//     ((track_index) == SHADERTOY_EXPERIMENT         ? SHADERTOY_EXPERIMENT_22K_WAV                                                                              \
+//      : (track_index) == SHADERTOY_ELECTRONEBULAE   ? SHADERTOY_ELECTRONEBULAE_22K_WAV                                                                          \
+//      : (track_index) == SHADERTOY_8BIT             ? SHADERTOY_8BIT_22K_WAV                                                                                    \
+//      : (track_index) == SHADERTOY_GEOMETRIC_PERSON ? SHADERTOY_GEOMETRIC_PERSON_22K_WAV                                                                        \
+//      : (track_index) == SHADERTOY_TROPICAL         ? SHADERTOY_TROPICAL_22K_WAV                                                                                \
+//                                                    : SHADERTOY_XTRACK_22K_WAV)
+
+//  : (track_index) == DDS_FFM                     ? DDS_FFM_FULL_22K_WAV                                                                                     \
+//  : (track_index) == RAMA                        ? RAMA_FULL_22K_WAV                                                                                        \
+//  : (track_index) == CT_LOR                      ? CT_LOR_FULL_22K_WAV                                                                                      \
+//  : (track_index) == AT_UNTITLED                 ? AT_UNTITLED_FULL_22K_WAV                                                                                 \
+//  : (track_index) == TJ_SAYO                     ? TJ_SAYO_FULL_22K_WAV                                                                                     \
+//  : (track_index) == KREUZSCHMERZEN_YOU_KNOW_WHY ? KREUZSCHMERZEN_YOU_KNOW_WHY_FULL_22K_WAV                                                                 \
+//  : (track_index) == M4_TBH                      ? M4_TBH_FULL_22K_WAV                                                                                      \
+//  : (track_index) == MG_NO_MONEY                 ? MG_NO_MONEY_FULL_22K_WAV
+
+static int audio_track_index = SHADERTOY_EXPERIMENT;
+
+static inline void unload_audio_track(void) {
+    RL_FREE(adpcm_checkpoint_history);
+    RL_FREE(adpcm_checkpoint_step_size);
+    adpcm_checkpoint_count = 0;
+    adpcm_checkpoint_filled_count = 0;
+    if (src_file) {
+        fs_close(src_file);
+    }
+    src_file = 0;
+    src_file_data_offset = 0;
+    src_file_chunk_size = 0;
+    src_file_fact_frame_count = 0;
+    src_file_format_tag = 0;
+    reset_adpcm_decoder();
+    wave = (Wave){0};
+}
+
+static inline void set_audio_track(int track_index) {
+    if (src_file) {
+        unload_audio_track();
+    }
+    audio_track_index = track_index;
+    src_file = fs_open(AUDIO_TRACK_PATH(audio_track_index), O_RDONLY);
+    wav_probe_data_chunk();
+    wave = (Wave){
+        .frameCount = src_file_fact_frame_count ? src_file_fact_frame_count : src_file_chunk_size * 2,
+        .sampleRate = SRC_SAMPLE_RATE,
+        .sampleSize = SRC_BIT_DEPTH,
+        .channels = SRC_CHANNELS,
+        .data = NULL,
+    };
+    reset_adpcm_decoder();
+    build_adpcm_checkpoints();
+    wave_cursor = 0;
+}
+
+static inline void update_audio_track_cycle(void) {
+    int dir = 0;
+    if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT)) {
+        dir = BACKWARD;
+    } else if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_UP)) {
+        dir = FORWARD;
+    }
+    if (dir == 0) {
+        return;
+    }
+
+    bool was_paused = is_paused;
+    audio_track_index += dir;
+    if (audio_track_index < 0) {
+        audio_track_index = AUDIO_TRACK_COUNT - 1;
+    } else if (audio_track_index >= AUDIO_TRACK_COUNT) {
+        audio_track_index = 0;
+    }
+
+    set_audio_track(audio_track_index);
+    wave_cursor = 0;
+    paused_wave_cursor = 0;
+    seek_delta_chunks = 0;
+    is_paused = false;
+    reset_sticky_nav();
+    if (was_paused) {
+        PlayAudioStream(audio_stream);
+    }
+}
+
+static inline void rebase_fft_spectrum_history_at_wave_cursor(void) {
+    MEMSET(fft_data.smoothed_spectrum_magnitudes, 0, sizeof(float) * ANALYSIS_SPECTRUM_BIN_COUNT);
+    MEMSET(fft_data.raw_spectrum_magnitudes, 0, sizeof(float[ANALYSIS_SPECTRUM_BIN_COUNT]) * ANALYSIS_FFT_HISTORY_FRAME_COUNT);
+    MEMSET(fft_data.spectrum_levels, 0, sizeof(float[ANALYSIS_SPECTRUM_BIN_COUNT]) * ANALYSIS_FFT_HISTORY_FRAME_COUNT);
+    fft_data.history_frame_pos = 0;
+    fft_data.frame_pos = 0;
+    reset_shared_adaptive_audio_state();
+
+    for (int i = ANALYSIS_FFT_HISTORY_FRAME_COUNT - 1; i >= 0; i--) {
+        int replay_frame_offset = WRAP(i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
+        int chunk_start_frame = WRAP_MINUS(wave_cursor, replay_frame_offset, wave.frameCount);
+        fffftt_inspection_fill_analysis_window(chunk_start_frame);
+        apply_blackman_window();
+        shz_fft((shz_complex_t*)fft_data.work_buffer, (size_t)ANALYSIS_WINDOW_SIZE_IN_FRAMES);
+        build_spectrum();
+    }
+}
+
+static void rebase_smooth_envelope_at_wave_cursor(void) {
+    for (int i = 0; i < LANE_COUNT; i++) {
+        int start_frame = WRAP_MINUS(wave_cursor, i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
+        fffftt_inspection_fill_analysis_window(start_frame);
+        smooth_lane(i);
+    }
+    fffftt_inspection_fill_analysis_window(wave_cursor);
+}
+
 #define WAVE_CURSOR_BLINK_RATE 8.0f
 static Model* wave_cursor_model = NULL;
 static Texture2D wave_cursor_texture = {0};
-#define FORWARD 1
-#define BACKWARD -1
+
+//TODO: this sticks ou like a sore thumb compared to when we just did it in the envelope code itself i think? or at least in parity with the terrains
+static inline void fffftt_inspection_step_sound_envelope(int dir) {
+    if (dir == BACKWARD) {
+        wave_cursor = WRAP_MINUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
+        seek_delta_chunks--;
+        for (int lane = 0; lane < LANE_COUNT - 1; lane++) {
+            for (int point = 0; point < LANE_POINT_COUNT; point++) {
+                lane_point_values[lane][point] = lane_point_values[lane + 1][point];
+            }
+        }
+        int tail_cursor = WRAP_MINUS(wave_cursor, (LANE_COUNT - 1) * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
+        fffftt_inspection_fill_analysis_window(tail_cursor);
+        smooth_lane(LANE_COUNT - 1);
+        fffftt_inspection_fill_analysis_window(wave_cursor);
+    } else if (dir == FORWARD) {
+        wave_cursor = WRAP_PLUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
+        seek_delta_chunks++;
+        for (int lane = LANE_COUNT - 1; lane > 0; lane--) {
+            for (int point = 0; point < LANE_POINT_COUNT; point++) {
+                lane_point_values[lane][point] = lane_point_values[lane - 1][point];
+            }
+        }
+        fffftt_inspection_fill_analysis_window(wave_cursor);
+        smooth_lane(0);
+    }
+}
 
 static void draw_paused_wave_cursor_lane_marker(int point_count) {
     int mesh_vertex_count = LANE_COUNT * point_count;
@@ -1049,6 +1372,8 @@ static void draw_paused_wave_cursor_lane_marker(int point_count) {
     wave_cursor_model->meshes[0].texcoords = saved_texcoords;
 }
 
+static Font font = {0};
+
 static inline void draw_wave_cursor_wheel_hud_row(const char* s, float x, float y, Color c) {
     for (int i = 0; s[i]; i++) {
         if (s[i] == ' ')
@@ -1078,9 +1403,7 @@ static inline void draw_wave_cursor_wheel_hud_bracketed_value(const char* value,
 static inline void draw_inspection_hud_wheel_row(int indent, float y, int row_offset, Color row_color) {
     int row_delta_chunks = seek_delta_chunks + row_offset;
     int row_delta_ms = (row_delta_chunks * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES * MILLISECONDS_PER_SECOND) / SRC_SAMPLE_RATE;
-    int display_cursor = (paused_wave_cursor + row_delta_chunks * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
-    if (display_cursor < 0)
-        display_cursor += wave.frameCount;
+    int display_cursor = WRAP(paused_wave_cursor + row_delta_chunks * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
     int display_cursor_ms = SAMPLE_CURSOR_TO_MS(display_cursor);
     Color color = row_delta_chunks == 0 ? NEON_CARROT : row_color;
     float x = 376.0f + (float)indent * 7.0f;
@@ -1120,46 +1443,25 @@ static void update_playback_controls_sound_envelope(void) {
         reset_sticky_nav();
         if (!is_paused) {
             is_paused = true;
-            wave_cursor = (wave_cursor + wave.frameCount - AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+            wave_cursor = WRAP_MINUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
             paused_wave_cursor = wave_cursor;
             seek_delta_chunks = 0;
-            for (int i = 0; i < MAX_DRAIN_CHUNK_COUNT; i++) {
-                while (!IsAudioStreamProcessed(audio_stream)) {
-                    /* KEEP DRAINING! */
-                }
-                UpdateAudioStream(audio_stream, drain_chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-            }
+            fffftt_audio_drain();
             PauseAudioStream(audio_stream);
             rebase_smooth_envelope_at_wave_cursor();
         } else {
             is_paused = false;
             PlayAudioStream(audio_stream);
-            while (IsAudioStreamProcessed(audio_stream)) {
-                for (int i = 0; i < AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES; i++) {
-                    resume_chunk_samples[i] = wave_pcm16[wave_cursor];
-                    if (++wave_cursor >= wave.frameCount) {
-                        wave_cursor = 0;
-                    }
-                }
-                UpdateAudioStream(audio_stream, resume_chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-
-                for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                    analysis_window_samples[i] = (float)resume_chunk_samples[i] / ANALYSIS_PCM16_UPPER_BOUND;
-                }
-
+            while (fffftt_audio_process(resume_chunk_samples)) {
                 advance_lane_history(&lane_point_values[0][0], LANE_POINT_COUNT);
                 smooth_lane(0);
             }
         }
     }
     if (is_paused && sticky_nav(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
-        wave_cursor = (wave_cursor + wave.frameCount - AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
-        seek_delta_chunks--;
-        rebase_smooth_envelope_at_wave_cursor();
+        fffftt_inspection_step_sound_envelope(BACKWARD);
     } else if (is_paused && sticky_nav(GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
-        wave_cursor = (wave_cursor + AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
-        seek_delta_chunks++;
-        rebase_smooth_envelope_at_wave_cursor();
+        fffftt_inspection_step_sound_envelope(FORWARD);
     }
 }
 
@@ -1169,123 +1471,27 @@ static void update_playback_controls_fft_spectrum(void) {
 
         if (!is_paused) {
             is_paused = true;
-            wave_cursor = (wave_cursor + wave.frameCount - AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+            wave_cursor = WRAP_MINUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
             paused_wave_cursor = wave_cursor;
             seek_delta_chunks = 0;
 
-            for (int i = 0; i < MAX_DRAIN_CHUNK_COUNT; i++) {
-                while (!IsAudioStreamProcessed(audio_stream)) {
-                    /* KEEP DRAINING! */
-                }
-                UpdateAudioStream(audio_stream, drain_chunk_samples, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
-            }
+            fffftt_audio_drain();
 
             PauseAudioStream(audio_stream);
-            for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-                int src = (wave_cursor + i) % wave.frameCount;
-                analysis_window_samples[i] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
-            }
+            fffftt_inspection_fill_analysis_window(wave_cursor);
         } else {
             is_paused = false;
             PlayAudioStream(audio_stream);
         }
     }
     if (is_paused && sticky_nav(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
-        wave_cursor = (wave_cursor + wave.frameCount - AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+        wave_cursor = WRAP_MINUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
         seek_delta_chunks--;
-        for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-            int src = (wave_cursor + i) % wave.frameCount;
-            analysis_window_samples[i] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
-        }
+        fffftt_inspection_fill_analysis_window(wave_cursor);
     } else if (is_paused && sticky_nav(GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
-        wave_cursor = (wave_cursor + AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES) % wave.frameCount;
+        wave_cursor = WRAP_PLUS(wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
         seek_delta_chunks++;
-        for (int i = 0; i < ANALYSIS_WINDOW_SIZE_IN_FRAMES; i++) {
-            int src = (wave_cursor + i) % wave.frameCount;
-            analysis_window_samples[i] = (float)wave_pcm16[src] / ANALYSIS_PCM16_UPPER_BOUND;
-        }
-    }
-}
-
-#define SHADERTOY_EXPERIMENT 0
-#define SHADERTOY_ELECTRONEBULAE 1
-#define SHADERTOY_8BIT 2
-#define SHADERTOY_GEOMETRIC_PERSON 3
-#define SHADERTOY_TROPICAL 4
-#define SHADERTOY_XTRACK 5
-#define DDS_FFM 6
-#define RAMA 7
-#define CT_LOR 8
-#define AT_UNTITLED 9
-#define TJ_SAYO 10
-#define KREUZSCHMERZEN_YOU_KNOW_WHY 11
-#define KREUZSCHMERZEN_RENT_DUE 12
-#define AUDIO_TRACK_COUNT 13
-
-#define AUDIO_TRACK_PATH(track_index)                                                                                                                          \
-    ((track_index) == SHADERTOY_EXPERIMENT          ? RD_SHADERTOY_EXPERIMENT_22K_WAV                                                                          \
-     : (track_index) == SHADERTOY_ELECTRONEBULAE    ? RD_SHADERTOY_ELECTRONEBULAE_22K_WAV                                                                      \
-     : (track_index) == SHADERTOY_8BIT              ? RD_SHADERTOY_8BIT_22K_WAV                                                                                \
-     : (track_index) == SHADERTOY_GEOMETRIC_PERSON  ? RD_SHADERTOY_GEOMETRIC_PERSON_22K_WAV                                                                    \
-     : (track_index) == SHADERTOY_TROPICAL          ? RD_SHADERTOY_TROPICAL_22K_WAV                                                                            \
-     : (track_index) == SHADERTOY_XTRACK            ? RD_SHADERTOY_XTRACK_22K_WAV                                                                              \
-     : (track_index) == DDS_FFM                     ? RD_DDS_FFM_22K_WAV                                                                                       \
-     : (track_index) == RAMA                        ? RD_RAMA_22K_WAV                                                                                          \
-     : (track_index) == CT_LOR                      ? RD_CT_LOR_22K_WAV                                                                                        \
-     : (track_index) == AT_UNTITLED                 ? RD_AT_UNTITLED_22K_WAV                                                                                   \
-     : (track_index) == TJ_SAYO                     ? RD_TJ_SAYO_22K_WAV                                                                                       \
-     : (track_index) == KREUZSCHMERZEN_YOU_KNOW_WHY ? RD_KREUZSCHMERZEN_YOU_KNOW_WHY_22K_WAV                                                                   \
-                                                    : RD_KREUZSCHMERZEN_RENT_DUE_22K_WAV)
-
-static int audio_track_index = SHADERTOY_EXPERIMENT;
-static Wave loaded_audio_tracks[AUDIO_TRACK_COUNT] = {0};
-
-static inline void load_audio_tracks(void) {
-    for (int i = 0; i < AUDIO_TRACK_COUNT; i++) {
-        loaded_audio_tracks[i] = LoadWave(AUDIO_TRACK_PATH(i));
-        WaveFormat(&loaded_audio_tracks[i], SRC_SAMPLE_RATE, SRC_BIT_DEPTH, SRC_CHANNELS);
-    }
-}
-
-static inline void set_audio_track(int track_index) {
-    audio_track_index = track_index;
-    wave = loaded_audio_tracks[audio_track_index];
-    wave_pcm16 = (int16_t*)wave.data;
-}
-
-static inline void unload_audio_tracks(void) {
-    for (int i = 0; i < AUDIO_TRACK_COUNT; i++) {
-        UnloadWave(loaded_audio_tracks[i]);
-    }
-}
-
-static inline void update_audio_track_cycle(void) {
-    int dir = 0;
-    if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT)) {
-        dir = BACKWARD;
-    } else if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_UP)) {
-        dir = FORWARD;
-    }
-    if (dir == 0) {
-        return;
-    }
-
-    bool was_paused = is_paused;
-    audio_track_index += dir;
-    if (audio_track_index < 0) {
-        audio_track_index = AUDIO_TRACK_COUNT - 1;
-    } else if (audio_track_index >= AUDIO_TRACK_COUNT) {
-        audio_track_index = 0;
-    }
-
-    set_audio_track(audio_track_index);
-    wave_cursor = 0;
-    paused_wave_cursor = 0;
-    seek_delta_chunks = 0;
-    is_paused = false;
-    reset_sticky_nav();
-    if (was_paused) {
-        PlayAudioStream(audio_stream);
+        fffftt_inspection_fill_analysis_window(wave_cursor);
     }
 }
 
