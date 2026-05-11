@@ -1,7 +1,7 @@
 [submodule "raylib_dc"]
 	path = raylib_dc
 	url = https://github.com/raylib4Consoles/raylib.git
-	branch = miniaudio_dreamcast
+	branch = raylib4Consoles_6.0
 [submodule "GLdc"]
 	path = GLdc
 	url = git@gitlab.com:meisei4/GLdc.git

@@ -47,8 +47,6 @@
 
 #define WRAP_PLUS(pos, amount, size) WRAP((pos) + (amount), (size))
 #define WRAP_MINUS(pos, amount, size) WRAP((pos) - (amount), (size))
-#define WRAP_OFFSET(start, pos, size) WRAP((pos) - (start), (size))
-#define FRAMES_TILL_NEXT_WRAP(pos, size) ((size) - (pos))
 
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
@@ -989,7 +987,8 @@ static int adpcm_checkpoint_filled_count = 0;
 static int16_t* adpcm_checkpoint_history = NULL;
 static int16_t* adpcm_checkpoint_step_size = NULL;
 
-//TODO: double check this verbosity against any much more tight and canonical ways to do this. i dont want any paranoia please
+// TODO: double check this verbosity against any much more tight and canonical ways to do this
+// e.g. currently all wavs are preprocessed to get the same header and tags via ffmpeg, so this owuld only be relevant for if later arbitrary wav files are handled, but adpcm...
 static inline int wav_probe_data_chunk(void) {
     src_file_data_offset = 0;
     src_file_chunk_size = 0;
@@ -1270,24 +1269,6 @@ static inline void update_audio_track_cycle(void) {
     }
 }
 
-static inline void rebase_fft_spectrum_history_at_wave_cursor(void) {
-    MEMSET(fft_data.smoothed_spectrum_magnitudes, 0, sizeof(float) * ANALYSIS_SPECTRUM_BIN_COUNT);
-    MEMSET(fft_data.raw_spectrum_magnitudes, 0, sizeof(float[ANALYSIS_SPECTRUM_BIN_COUNT]) * ANALYSIS_FFT_HISTORY_FRAME_COUNT);
-    MEMSET(fft_data.spectrum_levels, 0, sizeof(float[ANALYSIS_SPECTRUM_BIN_COUNT]) * ANALYSIS_FFT_HISTORY_FRAME_COUNT);
-    fft_data.history_frame_pos = 0;
-    fft_data.frame_pos = 0;
-    reset_shared_adaptive_audio_state();
-
-    for (int i = ANALYSIS_FFT_HISTORY_FRAME_COUNT - 1; i >= 0; i--) {
-        int replay_frame_offset = WRAP(i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
-        int chunk_start_frame = WRAP_MINUS(wave_cursor, replay_frame_offset, wave.frameCount);
-        fffftt_inspection_fill_analysis_window(chunk_start_frame);
-        apply_blackman_window();
-        shz_fft((shz_complex_t*)fft_data.work_buffer, (size_t)ANALYSIS_WINDOW_SIZE_IN_FRAMES);
-        build_spectrum();
-    }
-}
-
 static void rebase_smooth_envelope_at_wave_cursor(void) {
     for (int i = 0; i < LANE_COUNT; i++) {
         int start_frame = WRAP_MINUS(wave_cursor, i * AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES, wave.frameCount);
@@ -1497,22 +1478,6 @@ static void update_playback_controls_fft_spectrum(void) {
 
 #define CHROMA_COUNT 12
 #define CHROMA_INVERSE_LN_2 1.4426950408889634f
-#define CHROMA_SEMITONES_PER_OCTAVE 12.0f
-#define CHROMA_TUNING_RADIUS_SEMITONES 0.85f
-#define C9 8372.02f
-#define Db9 8870.0f
-#define D9 9398.0f
-#define Eb9 9974.0f
-#define E9 10548.0f
-#define F9 11176.0f
-#define Gb9 11840.0f
-#define G9 12544.0f
-#define Ab9 13290.0f
-#define A9 14080.0f
-#define Bb9 14918.0f
-#define B9 15804.0f
-#define REF_HZ_LUT {C9, Db9, D9, Eb9, E9, F9, Gb9, G9, Ab9, A9, Bb9, B9}
-#define REF_HZ_LOOKUP(index) (((const float[CHROMA_COUNT])REF_HZ_LUT)[(index)])
 #define ACCIDENTALS_LUT {1.0f, 0.5f, 1.0f, 0.5f, 1.0f, 1.0f, 0.5f, 1.0f, 0.5f, 1.0f, 0.5f, 1.0f}
 #define ACCIDENTAL_LOOKUP(index) (((const float[CHROMA_COUNT])ACCIDENTALS_LUT)[(index)])
 #define WUXING_COLOR_LOOKUP(index) (((const Color[CHROMA_COUNT])WUXING_CHROMA_LUT)[(index)])

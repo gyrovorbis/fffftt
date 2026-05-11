@@ -277,7 +277,11 @@ int main(void) {
         high_band_model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture.id = high_band_white_noise_texture.id;
         mid_band_model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture.id = mid_band_white_noise_texture.id;
         spectral_flatness_glitter_tint.a = (unsigned char)(spectral_flatness_glitter_alpha * (float)DRAW_COLOR_CHANNEL_MAX);
-        DrawModelPointsEx(high_band_model, HIGH_BAND_ANCHOR, Y_AXIS, 0.0f, DEFAULT_SCALE, spectral_flatness_glitter_tint);
+        rlEnablePointMode();
+        rlDisableDepthTest();
+        DrawModelEx(high_band_model, HIGH_BAND_ANCHOR, Y_AXIS, 0.0f, DEFAULT_SCALE, spectral_flatness_glitter_tint);
+        rlEnableDepthTest();
+        rlDisablePointMode();
         DrawModelWiresEx(mid_band_model, MID_BAND_ANCHOR, Y_AXIS, 0.0f, DEFAULT_SCALE, spectral_flatness_glitter_tint);
         low_band_model.meshes[0].colors = low_saved_colors;
         mid_band_model.meshes[0].colors = mid_saved_colors;

@@ -179,7 +179,11 @@ int main(void) {
         // rlEnableDepthTest();
         // model_a.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture.id = 0;
 
-        DrawModelPointsEx(model_a, TOP, Y_AXIS, 0.0f, DEFAULT_SCALE, BLUE);
+        rlEnablePointMode();
+        rlDisableDepthTest();
+        DrawModelEx(model_a, TOP, Y_AXIS, 0.0f, DEFAULT_SCALE, BLUE);
+        rlEnableDepthTest();
+        rlDisablePointMode();
         DrawModelWiresEx(model_a, BOTTOM, Y_AXIS, 0.0f, DEFAULT_SCALE, MAGENTA);
         if (is_paused) {
             draw_paused_wave_cursor_lane_marker(LANE_POINT_COUNT);

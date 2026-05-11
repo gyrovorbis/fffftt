@@ -178,7 +178,11 @@ int main(void) {
         glShadeModel(GL_SMOOTH);
         glDisable(GL_LIGHTING);
 
-        DrawModelPointsEx(model_a, TOP, Y_AXIS, 0.0f, DEFAULT_SCALE, BLUE);
+        rlEnablePointMode();
+        rlDisableDepthTest(); // TODO: this happened in v6.0?
+        DrawModelEx(model_a, TOP, Y_AXIS, 0.0f, DEFAULT_SCALE, BLUE);
+        rlEnableDepthTest();
+        rlDisablePointMode();
         DrawModelWiresEx(model_a, BOTTOM, Y_AXIS, 0.0f, DEFAULT_SCALE, MAGENTA);
         if (is_paused) {
             draw_paused_wave_cursor_lane_marker(LANE_POINT_COUNT);
