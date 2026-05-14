@@ -39,6 +39,7 @@ int main(void) {
         ClearBackground(BLACK);
 
         rlSetLineWidth(LINE_WIDTH_RASTER_PIXELS);
+        rlColor4ub(WHITE.r, WHITE.g, WHITE.b, WHITE.a);
         for (int i = 0; i < LANE_COUNT; i++) {
             rlEnableStatePointer(GL_VERTEX_ARRAY, envelope_mesh_vertices[i]);
             glDrawArrays(GL_LINE_STRIP, 0, LANE_POINT_COUNT);

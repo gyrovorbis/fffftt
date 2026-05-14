@@ -43,7 +43,7 @@ RES_8BIT_WAV := $(RES_DIR)/8bit_22k_mono_adpcm.wav
 RES_GEOMETRIC_PERSON_WAV := $(RES_DIR)/geometric_person_22k_mono_adpcm.wav
 RES_TROPICAL_WAV := $(RES_DIR)/tropical_22k_mono_adpcm.wav
 RES_XTRACK_WAV := $(RES_DIR)/xtrack_22k_mono_adpcm.wav
-RES_FONT_ASSETS := $(RES_DIR)/vga_rom_f16_0px_TIGHT.fnt $(RES_DIR)/vga_rom_f16_0px_TIGHT.png
+RES_FONT_ASSETS := $(RES_DIR)/vga.fnt $(RES_DIR)/vga.png
 
 SH4ZAM_BUTTERFLY_SRC := $(SRC_DIR)/sh4zam_butterfly.c
 PICKING_OUT_NOTES_DC_SRC := $(SRC_DIR)/picking_out_notes_dc.c

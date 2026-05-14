@@ -114,7 +114,7 @@
 #define SHADERTOY_TROPICAL_22K_WAV AUDIO_ASSET_PATH("tropical_22k_mono_adpcm.wav")
 #define SHADERTOY_XTRACK_22K_WAV AUDIO_ASSET_PATH("xtrack_22k_mono_adpcm.wav")
 
-#define RD_FONT "/rd/vga_rom_f16_0px_TIGHT.fnt" //TODO: nice 1KB...
+#define RD_FONT "/rd/vga.fnt" //TODO: nice 1KB...
 #define FONT_SIZE 16.0f
 
 typedef struct FFTComplex {

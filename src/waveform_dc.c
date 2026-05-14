@@ -107,6 +107,7 @@ int main(void) {
         update_waveform_vertices();
         rlEnableStatePointer(GL_VERTEX_ARRAY, waveform_vertices);
         rlSetLineWidth(WAVEFORM_LINE_WIDTH);
+        rlColor4ub(WHITE.r, WHITE.g, WHITE.b, WHITE.a);
         glDrawArrays(GL_LINE_STRIP, 0, ANALYSIS_WAVEFORM_SAMPLE_COUNT);
         // glDrawArrays(GL_LINES, 0, ANALYSIS_WAVEFORM_SAMPLE_COUNT);
         // glDrawArrays(GL_TRIANGLES, 0, ANALYSIS_WAVEFORM_SAMPLE_COUNT);
