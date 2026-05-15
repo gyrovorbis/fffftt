@@ -28,7 +28,8 @@ DC_KOS_CFLAGS := $(filter-out -I$(KOS_PORTS)/include,$(KOS_CFLAGS)) -I$(abspath 
 DC_CPPFLAGS := -I$(RAYLIB_DC_DIR) -I$(SRC_DIR) -I$(KOS_PORTS)/libwav/inst/include -I$(abspath $(GLDC_DIR))/include -DPLATFORM_DREAMCAST -DGRAPHICS_API_OPENGL_11
 
 AUDIO_ASSET_PATH_PREFIX := /rd/
-# AUDIO_ASSET_PATH_PREFIX := /pc/ # toggle this on and off for release .cdi vs direct romdisk packing
+# toggle below comment on and off for release .cdi vs direct romdisk packing
+# AUDIO_ASSET_PATH_PREFIX := /pc/
 DC_CPPFLAGS += -DAUDIO_ASSET_PATH_PREFIX=\"$(AUDIO_ASSET_PATH_PREFIX)\"
 DC_CPPFLAGS += $(if $(AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES),-DAUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES=$(AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES),)
 SH4ZAM_CPPFLAGS := -iquote $(SH4ZAM_DIR)/include
