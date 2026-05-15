@@ -1,3 +1,5 @@
+// https://github.com/meisei4/fffftt/blob/drafting/src/resources/waveform.glsl
+// https://www.shadertoy.com/view/tcSXRz
 #include "fffftt.h"
 #include "GL/gl.h"
 

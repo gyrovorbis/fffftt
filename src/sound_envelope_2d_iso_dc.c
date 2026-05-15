@@ -1,10 +1,15 @@
+// The following references are render clock cadence dependent versions of the sound envelope concept they differ
+// fundamentally around the context of shadertoy's statelessness, and also lack of control over audio clock synchronization!
+// https://github.com/meisei4/fffftt/blob/drafting/src/resources/sound_envelope_image.glsl
+// https://github.com/meisei4/fffftt/blob/drafting/src/resources/sound_envelope_buffer_a.glsl
+// https://www.shadertoy.com/view/7fXSWB
 #define FFFFTT_PROFILE_SOUND_ENVELOPE_ISO
 #include "fffftt.h"
 #include <GL/gl.h>
 
 #define LINE_WIDTH_RASTER_PIXELS 2.0f
 
-static const char* domain = "SOUND-ENVELOPE-DC";
+static const char* domain = "SOUND-ENVELOPE-2D-ISO-DC";
 
 static Vector3 envelope_mesh_vertices[LANE_COUNT][LANE_POINT_COUNT] = {0};
 

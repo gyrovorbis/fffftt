@@ -1,9 +1,7 @@
+// https://www.shadertoy.com/view/tcG3Rm
 #include "fffftt.h"
 
 static const char* domain = "PICKING-OUT-NOTES-DC";
-
-// TODO: below until `main` is a stylistic idea trying to just mirror the original shadertoy code: https://www.shadertoy.com/view/tcG3Rm
-//  WIP as an arguably absurd/pedantic style until maybe decide otherwise
 
 #define GRID_COLUMN_COUNT 12 // #L33 vec2(12,10)
 #define GRID_ROW_COUNT 10    // #L33 vec2(12,10)

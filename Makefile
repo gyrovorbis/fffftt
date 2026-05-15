@@ -48,7 +48,7 @@ RES_FONT_ASSETS := $(RES_DIR)/vga.fnt $(RES_DIR)/vga.png
 SH4ZAM_BUTTERFLY_SRC := $(SRC_DIR)/sh4zam_butterfly.c
 PICKING_OUT_NOTES_DC_SRC := $(SRC_DIR)/picking_out_notes_dc.c
 WAVEFORM_DC_SRC := $(SRC_DIR)/waveform_dc.c
-SOUND_ENVELOPE_DC_SRC := $(SRC_DIR)/sound_envelope_dc.c
+SOUND_ENVELOPE_2D_ISO_DC_SRC := $(SRC_DIR)/sound_envelope_2d_iso_dc.c
 SOUND_ENVELOPE_3D_DC_SRC := $(SRC_DIR)/sound_envelope_3d_dc.c
 WAVEFORM_TERRAIN_3D_DC_SRC := $(SRC_DIR)/waveform_terrain_3d_dc.c
 FFT_TERRAIN_3D_DC_SRC := $(SRC_DIR)/fft_terrain_3d_dc.c
@@ -60,7 +60,7 @@ SH4ZAM_COMPLEX_OBJ := $(BUILD_DIR)/dc/sh4zam/shz_complex.o
 SH4ZAM_BUTTERFLY_ELF := $(BUILD_DIR)/dc/sh4zam_butterfly/sh4zam_butterfly.elf
 PICKING_OUT_NOTES_DC_ELF := $(BUILD_DIR)/dc/picking_out_notes_dc/picking_out_notes_dc.elf
 WAVEFORM_DC_ELF := $(BUILD_DIR)/dc/waveform_dc/waveform_dc.elf
-SOUND_ENVELOPE_DC_ELF := $(BUILD_DIR)/dc/sound_envelope_dc/sound_envelope_dc.elf
+SOUND_ENVELOPE_2D_ISO_DC_ELF := $(BUILD_DIR)/dc/sound_envelope_2d_iso_dc/sound_envelope_2d_iso_dc.elf
 SOUND_ENVELOPE_3D_DC_ELF := $(BUILD_DIR)/dc/sound_envelope_3d_dc/sound_envelope_3d_dc.elf
 WAVEFORM_TERRAIN_3D_DC_ELF := $(BUILD_DIR)/dc/waveform_terrain_3d_dc/waveform_terrain_3d_dc.elf
 FFT_TERRAIN_3D_DC_ELF := $(BUILD_DIR)/dc/fft_terrain_3d_dc/fft_terrain_3d_dc.elf
@@ -69,15 +69,15 @@ FFT_BANDS_TERRAIN_3D_DC_ELF := $(BUILD_DIR)/dc/fft_bands_terrain_3d_dc/fft_bands
 SH4ZAM_BUTTERFLY_RUN := $(BIN_DIR)/sh4zam_butterfly
 PICKING_OUT_NOTES_DC_RUN := $(BIN_DIR)/picking_out_notes_dc
 WAVEFORM_DC_RUN := $(BIN_DIR)/waveform_dc
-SOUND_ENVELOPE_DC_RUN := $(BIN_DIR)/sound_envelope_dc
+SOUND_ENVELOPE_2D_ISO_DC_RUN := $(BIN_DIR)/sound_envelope_2d_iso_dc
 SOUND_ENVELOPE_3D_DC_RUN := $(BIN_DIR)/sound_envelope_3d_dc
 WAVEFORM_TERRAIN_3D_DC_RUN := $(BIN_DIR)/waveform_terrain_3d_dc
 FFT_TERRAIN_3D_DC_RUN := $(BIN_DIR)/fft_terrain_3d_dc
 FFT_BANDS_TERRAIN_3D_DC_RUN := $(BIN_DIR)/fft_bands_terrain_3d_dc
 
-DC_ELFS := $(SH4ZAM_BUTTERFLY_ELF) $(PICKING_OUT_NOTES_DC_ELF) $(WAVEFORM_DC_ELF) $(SOUND_ENVELOPE_DC_ELF) $(SOUND_ENVELOPE_3D_DC_ELF) $(WAVEFORM_TERRAIN_3D_DC_ELF) $(FFT_TERRAIN_3D_DC_ELF) $(FFT_BANDS_TERRAIN_3D_DC_ELF)
-DC_RUNS := $(SH4ZAM_BUTTERFLY_RUN) $(PICKING_OUT_NOTES_DC_RUN) $(WAVEFORM_DC_RUN) $(SOUND_ENVELOPE_DC_RUN) $(SOUND_ENVELOPE_3D_DC_RUN) $(WAVEFORM_TERRAIN_3D_DC_RUN) $(FFT_TERRAIN_3D_DC_RUN) $(FFT_BANDS_TERRAIN_3D_DC_RUN)
-PHONY_DC_TARGETS := sh4zam-butterfly picking-out-notes-dc waveform-dc sound-envelope-dc sound-envelope-3d-dc waveform-terrain-3d-dc fft-terrain-3d-dc fft-bands-terrain-3d-dc
+DC_ELFS := $(SH4ZAM_BUTTERFLY_ELF) $(PICKING_OUT_NOTES_DC_ELF) $(WAVEFORM_DC_ELF) $(SOUND_ENVELOPE_2D_ISO_DC_ELF) $(SOUND_ENVELOPE_3D_DC_ELF) $(WAVEFORM_TERRAIN_3D_DC_ELF) $(FFT_TERRAIN_3D_DC_ELF) $(FFT_BANDS_TERRAIN_3D_DC_ELF)
+DC_RUNS := $(SH4ZAM_BUTTERFLY_RUN) $(PICKING_OUT_NOTES_DC_RUN) $(WAVEFORM_DC_RUN) $(SOUND_ENVELOPE_2D_ISO_DC_RUN) $(SOUND_ENVELOPE_3D_DC_RUN) $(WAVEFORM_TERRAIN_3D_DC_RUN) $(FFT_TERRAIN_3D_DC_RUN) $(FFT_BANDS_TERRAIN_3D_DC_RUN)
+PHONY_DC_TARGETS := sh4zam-butterfly picking-out-notes-dc waveform-dc sound-envelope-2d-iso-dc sound-envelope-3d-dc waveform-terrain-3d-dc fft-terrain-3d-dc fft-bands-terrain-3d-dc
 
 FMT ?= $(shell command -v clang-format 2>/dev/null || xcrun --find clang-format 2>/dev/null || echo clang-format)
 FMT_STYLE ?= ./.clang-format
@@ -93,7 +93,7 @@ all: help
 sh4zam-butterfly: $(SH4ZAM_BUTTERFLY_RUN)
 picking-out-notes-dc: $(PICKING_OUT_NOTES_DC_RUN)
 waveform-dc: $(WAVEFORM_DC_RUN)
-sound-envelope-dc: $(SOUND_ENVELOPE_DC_RUN)
+sound-envelope-2d-iso-dc: $(SOUND_ENVELOPE_2D_ISO_DC_RUN)
 sound-envelope-3d-dc: $(SOUND_ENVELOPE_3D_DC_RUN)
 waveform-terrain-3d-dc: $(WAVEFORM_TERRAIN_3D_DC_RUN)
 fft-terrain-3d-dc: $(FFT_TERRAIN_3D_DC_RUN)
@@ -123,7 +123,7 @@ endef
 $(eval $(call RUN_RULE,$(SH4ZAM_BUTTERFLY_RUN),$(SH4ZAM_BUTTERFLY_ELF)))
 $(eval $(call RUN_RULE,$(PICKING_OUT_NOTES_DC_RUN),$(PICKING_OUT_NOTES_DC_ELF)))
 $(eval $(call RUN_RULE,$(WAVEFORM_DC_RUN),$(WAVEFORM_DC_ELF)))
-$(eval $(call RUN_RULE,$(SOUND_ENVELOPE_DC_RUN),$(SOUND_ENVELOPE_DC_ELF)))
+$(eval $(call RUN_RULE,$(SOUND_ENVELOPE_2D_ISO_DC_RUN),$(SOUND_ENVELOPE_2D_ISO_DC_ELF)))
 $(eval $(call RUN_RULE,$(SOUND_ENVELOPE_3D_DC_RUN),$(SOUND_ENVELOPE_3D_DC_ELF)))
 $(eval $(call RUN_RULE,$(WAVEFORM_TERRAIN_3D_DC_RUN),$(WAVEFORM_TERRAIN_3D_DC_ELF)))
 $(eval $(call RUN_RULE,$(FFT_TERRAIN_3D_DC_RUN),$(FFT_TERRAIN_3D_DC_ELF)))
@@ -152,8 +152,8 @@ $(PICKING_OUT_NOTES_DC_ELF): $(PICKING_OUT_NOTES_DC_SRC) $(SH4ZAM_COMPLEX_OBJ)
 $(WAVEFORM_DC_ELF): SRC := $(WAVEFORM_DC_SRC)
 $(WAVEFORM_DC_ELF): $(WAVEFORM_DC_SRC)
 
-$(SOUND_ENVELOPE_DC_ELF): SRC := $(SOUND_ENVELOPE_DC_SRC)
-$(SOUND_ENVELOPE_DC_ELF): $(SOUND_ENVELOPE_DC_SRC)
+$(SOUND_ENVELOPE_2D_ISO_DC_ELF): SRC := $(SOUND_ENVELOPE_2D_ISO_DC_SRC)
+$(SOUND_ENVELOPE_2D_ISO_DC_ELF): $(SOUND_ENVELOPE_2D_ISO_DC_SRC)
 
 $(SOUND_ENVELOPE_3D_DC_ELF): SRC := $(SOUND_ENVELOPE_3D_DC_SRC)
 $(SOUND_ENVELOPE_3D_DC_ELF): $(SOUND_ENVELOPE_3D_DC_SRC)

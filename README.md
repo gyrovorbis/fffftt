@@ -9,70 +9,144 @@
   &nbsp;&nbsp;&nbsp;&nbsp;.h file ........................... shared prototypes/functions in <a href="https://github.com/meisei4/fffftt/blob/main/src/fffftt.h">src/fffftt.h</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;.c files .......................... one demo per file in <a href="https://github.com/meisei4/fffftt/tree/main/src">src/</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;.wav files ........................ <a href="https://shadertoyunofficial.wordpress.com/2019/07/23/shadertoy-media-files/">shadertoy media files</a>; adpcm .wavs in <a href="https://github.com/meisei4/fffftt/tree/main/src/resources">src/resources</a><br>
-  &nbsp;&nbsp;&nbsp;&nbsp;controls .......................... cycle tracks, pause/resume, seek, move light<br><!-- add a nice control scheme for gamepad-->
+  &nbsp;&nbsp;&nbsp;&nbsp;controls .......................... cycle tracks, pause/resume, seek, move light<br><!-- TODO: add a nice control scheme for gamepad-->
   &nbsp;&nbsp;&nbsp;&nbsp;audio terrain demos ............... see <a href="#audio-terrain">[audio terrain]</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;shadertoy ports ................... see <a href="#shadertoy-ports">[shadertoy ports]</a><br>
 <br>
 </samp>
 
 
+<!-- VIDEO LINKS
+fft-bands-terrain-3d-dc.webm
+https://github.com/user-attachments/assets/a3d40286-c825-47b8-a23c-37da2c11104b
+
+fft-terrain-3d-dc.webm
+https://github.com/user-attachments/assets/10ededf9-a84c-4453-9467-b5b14c48c159
+
+sh4zam-butterfly.webm
+https://github.com/user-attachments/assets/ea2e14af-491f-4c03-a99d-6b5a3fc05ea5
+
+sound-envelope-3d-dc.webm
+https://github.com/user-attachments/assets/8c82a7cf-21d2-4a8a-8655-e6d558400be6
+
+waveform-dc.webm
+https://github.com/user-attachments/assets/446ba918-171c-4fb5-8901-9f618db08cbb
+
+waveform-terrain-3d-dc.webm
+https://github.com/user-attachments/assets/bd9c1301-2ef7-401a-9969-aa6358c36345
+-->
+
+
+<!--
+PROXY PLOTS:
+ORDER OF FILES BELOW OF THE URLS:
+fft_bands_terrain_chroma.png
+fft_bands_terrain.png
+fft_high_band_terrain_spectral_flatness.png
+fft_low_band_terrain_onset_brightness_wash.png
+fft_low_band_terrain_onset_curtain.png
+fft_low_band_terrain_onset_scribbles.png
+fft_terrain_chroma.png
+fft_terrain_onset_brightness_wash.png
+fft_terrain_onset_curtain.png
+fft_terrain_onset_scribbles.png
+fft_terrain.png
+waveform_terrain_hilbert_overlay_signed.png
+waveform_terrain_hilbert_overlay.png
+waveform_terrain_onset_brightness_wash_signed.png
+waveform_terrain_onset_brightness_wash.png
+waveform_terrain_onset_curtain_signed.png
+waveform_terrain_onset_curtain.png
+waveform_terrain_onset_scribbles_signed.png
+waveform_terrain_onset_scribbles.png
+waveform_terrain_rms_signed.png
+waveform_terrain_rms.png
+waveform_terrain_signed.png
+waveform_terrain.png
+
+
+<img width="1533" height="1204" alt="Image" src="https://github.com/user-attachments/assets/6bddceb9-1566-4629-9dc8-bba4da1f6e8d" />
+
+<img width="1837" height="1072" alt="Image" src="https://github.com/user-attachments/assets/87971a00-daf0-4e57-a2cc-70d343af97dd" />
+
+<img width="1533" height="1204" alt="Image" src="https://github.com/user-attachments/assets/f09c9416-ced4-4595-8bd0-7808599cd87b" />
+
+<img width="1545" height="1204" alt="Image" src="https://github.com/user-attachments/assets/9a9ddfbf-4f6b-4705-963d-4f7c0b2517e2" />
+
+<img width="1545" height="1204" alt="Image" src="https://github.com/user-attachments/assets/6b7040e7-a58b-4fdb-a4e7-f1edc1ed73fe" />
+
+<img width="1545" height="1204" alt="Image" src="https://github.com/user-attachments/assets/52cee05d-8884-4395-a322-d0ccf58beb4c" />
+
+<img width="1515" height="1204" alt="Image" src="https://github.com/user-attachments/assets/5e665f0b-0eb5-4e2a-8806-c7071e8de617" />
+
+<img width="1515" height="1204" alt="Image" src="https://github.com/user-attachments/assets/12968c3f-3290-4feb-b365-073fe877209e" />
+
+<img width="1527" height="1204" alt="Image" src="https://github.com/user-attachments/assets/a86284ca-6ced-4a8b-a9df-765beec42606" />
+
+<img width="1527" height="1204" alt="Image" src="https://github.com/user-attachments/assets/2d7ba571-c45e-43ac-888a-8fa9f462f3ba" />
+
+<img width="1515" height="1204" alt="Image" src="https://github.com/user-attachments/assets/5a220009-1159-43a5-9bc0-177c611bc6a4" />
+
+<img width="1545" height="1204" alt="Image" src="https://github.com/user-attachments/assets/f329d334-4dbd-4420-9a23-31e31f3919ba" />
+
+<img width="1539" height="1204" alt="Image" src="https://github.com/user-attachments/assets/a50316b4-21fb-4ffb-8e5f-bd6980f2d1c8" />
+
+<img width="1521" height="1204" alt="Image" src="https://github.com/user-attachments/assets/e9c11112-a628-4a91-8be7-e300ef8f794b" />
+
+<img width="1515" height="1204" alt="Image" src="https://github.com/user-attachments/assets/31c1fcf6-6e22-48e5-ac48-e3a66ee81860" />
+
+<img width="1533" height="1204" alt="Image" src="https://github.com/user-attachments/assets/a583bb0a-231d-47ba-9997-cf4fd37ae69d" />
+
+<img width="1527" height="1204" alt="Image" src="https://github.com/user-attachments/assets/5403340f-0bcc-426b-94d6-67ddae7e98cb" />
+
+<img width="1533" height="1204" alt="Image" src="https://github.com/user-attachments/assets/6c5a90f8-94ae-4a7d-a1db-462a317cb0c5" />
+
+<img width="1527" height="1204" alt="Image" src="https://github.com/user-attachments/assets/f04592af-597d-4985-a508-d2868b7e7121" />
+
+<img width="1521" height="1204" alt="Image" src="https://github.com/user-attachments/assets/6e637a6a-70f2-4f1c-a91d-c0b3589d2223" />
+
+<img width="1515" height="1204" alt="Image" src="https://github.com/user-attachments/assets/9c48420e-90d9-4dc2-90c4-eafd3ed73682" />
+
+<img width="1521" height="1204" alt="Image" src="https://github.com/user-attachments/assets/d29ce744-460e-4d78-ada5-dc6c8c39d42f" />
+
+<img width="1515" height="1204" alt="Image" src="https://github.com/user-attachments/assets/fea18140-8d4c-4117-9283-74b7b15742d1" />
+
+-->
+
 <samp>[audio terrain]<br>
   &nbsp;&nbsp;&nbsp;&nbsp;[waveform terrain]<br>
   &nbsp;&nbsp;&nbsp;&nbsp;<a href="https://github.com/meisei4/fffftt/blob/main/src/waveform_terrain_3d_dc.c">src/waveform_terrain_3d_dc.c</a> ...... uses <b>Hilbert envelope</b>, <b>RMS</b>, and naive <b>onset strength</b><br>
 </samp>
-<!-- ADD WAVFROM TERRAIN VIDEOS!!!!!!-->
+
 
 <samp>
   &nbsp;&nbsp;&nbsp;&nbsp;[fft terrain]<br>
   &nbsp;&nbsp;&nbsp;&nbsp;<a href="https://github.com/meisei4/fffftt/blob/main/src/fft_terrain_3d_dc.c">src/fft_terrain_3d_dc.c</a> ........... uses <b>chroma</b> and spectral-flux <b>onset strength</b><br>
 </samp>
-<!-- ADD FFT TERRAIN VIDEOS!!!!!!-->
+
 
 <samp>
   &nbsp;&nbsp;&nbsp;&nbsp;[fft bands terrain]<br>
   &nbsp;&nbsp;&nbsp;&nbsp;<a href="https://github.com/meisei4/fffftt/blob/main/src/fft_bands_terrain_3d_dc.c">src/fft_bands_terrain_3d_dc.c</a> ..... uses low/mid/high FFT bands + <b>spectral flatness</b><br><br>
 </samp>
-<!-- ADD BANDS TERRAIN VIDEOS!!!!!!-->
-
-<!-- ADD THE PRIMARY PROXY PLOTS FOR EACH TERRAIN VIDEO UNDERNEATH-->
-
-<!-- POTENTIALLY MOVE THIS TO A SEPARATE DOC
-<samp>[audio terrain context]<br>
-  &nbsp;&nbsp;&nbsp;&nbsp;<b>onset strength</b> .................... <a href="https://en.wikipedia.org/wiki/Onset_(audio)">Wikipedia: onset</a>, <a href="https://librosa.org/doc/main/generated/librosa.onset.onset_strength.html">librosa: onset_strength</a>, <a href="https://librosa.org/doc/main/generated/librosa.onset.onset_detect.html">librosa: onset_detect</a><br>
-</samp>
-<samp>
-  &nbsp;&nbsp;&nbsp;&nbsp;<b>spectral flatness</b> ................. <a href="https://en.wikipedia.org/wiki/Spectral_flatness">Wikipedia: spectral flatness</a>, <a href="https://librosa.org/doc/main/generated/librosa.feature.spectral_flatness.html">librosa: spectral_flatness</a><br>
-</samp>
-<samp>
-  &nbsp;&nbsp;&nbsp;&nbsp;<b>chroma</b> ............................ <a href="https://en.wikipedia.org/wiki/Chroma_feature">Wikipedia: chroma feature</a>, <a href="https://librosa.org/doc/main/generated/librosa.feature.chroma_stft.html">librosa: chroma_stft</a>, <a href="https://librosa.org/doc/main/generated/librosa.filters.chroma.html">librosa: chroma filters</a><br>
-</samp>
-<samp>
-  &nbsp;&nbsp;&nbsp;&nbsp;<b>Hilbert-filtered envelope</b> ......... <a href="https://en.wikipedia.org/wiki/Hilbert_transform">Wikipedia: Hilbert transform</a>, <a href="https://en.wikipedia.org/wiki/Analytic_signal">Wikipedia: analytic signal</a>, <a href="https://www.mathworks.com/help/signal/ref/envelope.html">MATLAB: envelope</a>, <a href="https://www.mathworks.com/help/signal/ref/hilbert.html">MATLAB: hilbert</a><br>
-</samp>
-<samp>
-  &nbsp;&nbsp;&nbsp;&nbsp;<b>RMS</b> ............................... <a href="https://en.wikipedia.org/wiki/Root_mean_square">Wikipedia: root mean square</a>, <a href="https://librosa.org/doc/main/generated/librosa.feature.rms.html">librosa: rms</a>, <a href="https://www.mathworks.com/help/signal/ref/envelope.html">MATLAB: envelope</a><br>
-<br>
-</samp>
--->
 
 
-<!-- NEW HUD INCLUDED VIDEOS COMING-->
-<!-- REFERENCE TO drafting branch?-->
 <samp>[shadertoy ports]<br>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[meisei4: basic fft visualizer]<br>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shadertoy: <a href="https://www.shadertoy.com/view/t3jGzm">https://www.shadertoy.com/view/t3jGzm</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;src: <a href="https://github.com/meisei4/fffftt/blob/main/src/sh4zam_butterfly.c">src/sh4zam_butterfly.c</a><br>
-  <!-- FIGURE OUT A READABLE CONVENTION HERE FOR HOW TO MAKE IT CLEAR WHERE THE C PROGRAM IS OR IF WE MENTION THE MAKE TARGET IDK!!!!!!!-->
 </samp>
 <table width="928">
   <tr>
+    <td width="464" align="center"><samp>Dreamcast capture</samp></td>
+    <td width="464" align="center"><samp>Shadertoy capture</samp></td>
+  </tr>
+  <tr>
     <td width="464" align="center">
       <video src="https://github.com/user-attachments/assets/358c96bd-2520-42e1-acb0-8aec52358ad5" autoplay loop muted playsinline width="464" height="261"></video><br>
-      <sub><samp>Dreamcast capture</samp></sub>
     </td>
     <td width="464" align="center">
       <video src="https://github.com/user-attachments/assets/9538fb97-79ec-434c-b659-74deec5030a3" autoplay loop muted playsinline width="464" height="261"></video><br>
-      <sub><samp>Shadertoy capture</samp></sub>
     </td>
   </tr>
 </table>
@@ -85,13 +159,15 @@
 </samp>
 <table width="928">
   <tr>
+    <td width="464" align="center"><samp>Dreamcast capture</samp></td>
+    <td width="464" align="center"><samp>Shadertoy capture</samp></td>
+  </tr>
+  <tr>
     <td width="464" align="center">
       <video src="https://github.com/user-attachments/assets/f942edb3-cb31-4095-851c-5b907f006d29" autoplay loop muted playsinline width="464" height="261"></video><br>
-      <sub><samp>Dreamcast capture</samp></sub>
     </td>
     <td width="464" align="center">
       <video src="https://github.com/user-attachments/assets/ff68e8b7-095f-4a61-b838-3e82e0a52e5d" autoplay loop muted playsinline width="464" height="261"></video><br>
-      <sub><samp>Shadertoy capture</samp></sub>
     </td>
   </tr>
 </table>
@@ -104,13 +180,15 @@
 </samp>
 <table width="928">
   <tr>
+    <td width="464" align="center"><samp>Dreamcast capture</samp></td>
+    <td width="464" align="center"><samp>Shadertoy capture</samp></td>
+  </tr>
+  <tr>
     <td width="464" align="center">
       <video src="https://github.com/user-attachments/assets/9dab963d-eabd-40d1-b541-5c6f3e64c544" autoplay loop muted playsinline width="464" height="261"></video><br>
-      <sub><samp>Dreamcast capture</samp></sub>
     </td>
     <td width="464" align="center">
       <video src="https://github.com/user-attachments/assets/df219ba5-18be-4a7e-a023-edb22fd3e6ea" autoplay loop muted playsinline width="464" height="261"></video><br>
-      <sub><samp>Shadertoy capture</samp></sub>
     </td>
   </tr>
 </table>
@@ -119,26 +197,27 @@
 <samp>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[meisei4: sound envelope reference]<br>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shadertoy: <a href="https://www.shadertoy.com/view/7fXSWB">https://www.shadertoy.com/view/7fXSWB</a><br>
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;src: <a href="https://github.com/meisei4/fffftt/blob/main/src/sound_envelope_dc.c">src/sound_envelope_dc.c</a> / <a href="https://github.com/meisei4/fffftt/blob/main/src/sound_envelope_3d_dc.c">sound_envelope_3d_dc.c</a><br>
-    <!-- Maybe explain iso vs 3d -->
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;src: <a href="https://github.com/meisei4/fffftt/blob/main/src/sound_envelope_2d_iso_dc.c">src/sound_envelope_2d_iso_dc.c</a> / <a href="https://github.com/meisei4/fffftt/blob/main/src/sound_envelope_3d_dc.c">sound_envelope_3d_dc.c</a><br>
 </samp>
 <table width="928">
   <tr>
+    <td width="232" align="center"><samp>Dreamcast 2D isometric</samp></td>
+    <td width="232" align="center"><samp>Dreamcast 3D</samp></td>
+    <td width="232" align="center"><samp>GL33 capture</samp></td>
+    <td width="232" align="center"><samp>Shadertoy capture</samp></td>
+  </tr>
+  <tr>
     <td width="232" align="center">
       <video src="https://github.com/user-attachments/assets/ac36e5e0-c8a5-42bc-aa92-9303712dc4a7" autoplay loop muted playsinline width="232" height="131"></video><br>
-      <sub><samp>Dreamcast 2D isometric</samp></sub>
     </td>
     <td width="232" align="center">
       <video src="https://github.com/user-attachments/assets/d9d90e0c-82a5-44ed-a485-5b57db02a299" autoplay loop muted playsinline width="232" height="131"></video><br>
-      <sub><samp>Dreamcast 3D</samp></sub>
     </td>
     <td width="232" align="center">
       <video src="https://github.com/user-attachments/assets/d34794b5-c1d7-47bd-9e90-fc808389ccb4" autoplay loop muted playsinline width="232" height="131"></video><br>
-      <sub><samp>GL33 capture</samp></sub>
     </td>
     <td width="232" align="center">
       <video src="https://github.com/user-attachments/assets/71ac43c5-8667-4efa-9bea-558f183f5602" autoplay loop muted playsinline width="232" height="131"></video><br>
-      <sub><samp>Shadertoy capture</samp></sub>
     </td>
   </tr>
 </table>
@@ -155,15 +234,6 @@ cd fffftt
 git submodule update --init --recursive
 ```
 
-
-<!-- 
-<samp>[Makefile]<br>
-&nbsp;&nbsp;&nbsp;&nbsp;Makefile <a href="https://github.com/meisei4/fffftt/blob/main/Makefile">Makefile</a> expects a configured <code>KallistiOS</code> / <code>KOS</code> environment.<br>
-&nbsp;&nbsp;&nbsp;&nbsp;Dreamcast development <a href="https://dreamcast.wiki/Getting_Started_with_Dreamcast_development">Getting Started with Dreamcast development</a>.<br>
-</samp>
--->
-
-
 <samp>[all demos]</samp>
 
 ```bash
@@ -175,7 +245,7 @@ make fft-bands-terrain-3d-dc      # run: ./bin/fft_bands_terrain_3d_dc
 
 # [waveform]
 make waveform-dc                  # run: ./bin/waveform_dc
-make sound-envelope-dc            # run: ./bin/sound_envelope_dc
+make sound-envelope-2d-iso-dc            # run: ./bin/sound_envelope_2d_iso_dc
 make sound-envelope-3d-dc         # run: ./bin/sound_envelope_3d_dc
 make waveform-terrain-3d-dc       # run: ./bin/waveform_terrain_3d_dc
 ```

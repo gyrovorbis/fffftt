@@ -1,3 +1,5 @@
+// https://github.com/meisei4/fffftt/blob/drafting/src/resources/fft.glsl
+// https://www.shadertoy.com/view/t3jGzm
 #include "fffftt.h"
 
 static const char* domain = "SH4ZAM-BUTTERFLY";

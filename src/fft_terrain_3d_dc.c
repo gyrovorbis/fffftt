@@ -150,9 +150,9 @@ int main(void) {
         // glLightfv(GL_LIGHT0, GL_DIFFUSE, (const GLfloat[]){0.6f, 0.6f, 0.6f, 1.0f});
         glLightfv(GL_LIGHT0, GL_DIFFUSE, light0_diffuse);
         glLightfv(GL_LIGHT0, GL_POSITION, (const GLfloat[]){light0_pos.x, light0_pos.y, light0_pos.z, 1.0f});
-        rlDisableBackfaceCulling();
+        // rlDisableBackfaceCulling();
         DrawModelEx(model_a, MIDDLE, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
-        rlEnableBackfaceCulling();
+        // rlEnableBackfaceCulling();
         glDisable(GL_LIGHTING);
         draw_lantern(light0_pos);
         draw_lantern_glow(light0_pos);
@@ -163,9 +163,9 @@ int main(void) {
         glLightfv(GL_LIGHT0, GL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
         glLightfv(GL_LIGHT0, GL_DIFFUSE, (const GLfloat[]){1.0f, 1.0f, 1.0f, 1.0f});
         glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, (const GLfloat[]){0.0f, 0.0f, 0.0f, 0.0f});
-        rlDisableBackfaceCulling();
-        DrawModelEx(flat_model, TOP, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE); //TODO: too powerful...
-        rlEnableBackfaceCulling();
+        // rlDisableBackfaceCulling();
+        DrawModelEx(flat_model, TOP, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE); // TODO: rough on 64 byte Vertex GLdc
+        // rlEnableBackfaceCulling();
         glShadeModel(GL_SMOOTH);
         glDisable(GL_LIGHTING);
 

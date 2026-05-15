@@ -12,7 +12,7 @@ build_targets=(
   sh4zam-butterfly
   picking-out-notes-dc
   waveform-dc
-  sound-envelope-dc
+  sound-envelope-2d-iso-dc
   sound-envelope-3d-dc
   waveform-terrain-3d-dc
   fft-terrain-3d-dc
@@ -23,7 +23,7 @@ run_targets=(
   "sh4zam-butterfly|$project_root/bin/sh4zam_butterfly|$log_directory/sh4zam-butterfly.log"
   "picking-out-notes-dc|$project_root/bin/picking_out_notes_dc|$log_directory/picking-out-notes-dc.log"
   "waveform-dc|$project_root/bin/waveform_dc|$log_directory/waveform-dc.log"
-  "sound-envelope-dc|$project_root/bin/sound_envelope_dc|$log_directory/sound-envelope-dc.log"
+  "sound-envelope-2d-iso-dc|$project_root/bin/sound_envelope_2d_iso_dc|$log_directory/sound-envelope-2d-iso-dc.log"
   "sound-envelope-3d-dc|$project_root/bin/sound_envelope_3d_dc|$log_directory/sound-envelope-3d-dc.log"
   "waveform-terrain-3d-dc|$project_root/bin/waveform_terrain_3d_dc|$log_directory/waveform-terrain-3d-dc.log"
   "fft-terrain-3d-dc|$project_root/bin/fft_terrain_3d_dc|$log_directory/fft-terrain-3d-dc.log"

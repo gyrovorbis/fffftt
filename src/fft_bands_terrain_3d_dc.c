@@ -358,7 +358,6 @@ build_band_terrain(float* lane_point_values, int point_count, const float* level
 #define SPECTRAL_FLATNESS_AMIN 1.0e-10f // amin: float = 1e-10,
 
 static void update_spectral_flatness_glitter_alpha(const float* raw_spectrum_magnitudes) {
-    // https://librosa.org/doc/main/generated/librosa.feature.spectral_flatness.html
     const int bin_min = HIGH_BAND_BIN_BOUNDS[0][0];
     const int bin_max = HIGH_BAND_BIN_BOUNDS[HIGH_BAND_POINT_COUNT - 1][1];
     const int bin_count = bin_max - bin_min + 1;
