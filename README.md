@@ -18,6 +18,43 @@
 
 ### <samp>[audio terrain]</samp>
 <samp>
+  &nbsp;&nbsp;&nbsp;&nbsp;[fft bands terrain]<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<a href="https://github.com/meisei4/fffftt/blob/main/src/fft_bands_terrain_3d_dc.c">src/fft_bands_terrain_3d_dc.c</a> ..... FFT bands; mid: <b>chroma</b>, low: <b>onset strength</b>, high: <b>spectral flatness</b><br>
+</samp>
+
+<table width="1056">
+  <tr>
+    <td width="464" rowspan="2" align="left">
+      <video src="https://github.com/user-attachments/assets/a3d40286-c825-47b8-a23c-37da2c11104b" autoplay loop muted playsinline width="464" height="348"></video>
+      <sub><samp>audio should work^^^ otherwise: <a href="https://github.com/user-attachments/assets/a3d40286-c825-47b8-a23c-37da2c11104b">fft-bands-terrain-3d-dc.webm</a>)</samp></sub>
+    </td>
+    <td width="296" rowspan="2" align="center">
+      <img src="https://github.com/user-attachments/assets/87971a00-daf0-4e57-a2cc-70d343af97dd" alt="fft_bands_terrain.png" width="292"><br>
+      <samp>fft bands terrain</samp>
+    </td>
+    <td width="148" align="center">
+      <img src="https://github.com/user-attachments/assets/6bddceb9-1566-4629-9dc8-bba4da1f6e8d" alt="fft_bands_terrain_chroma.png" width="142"><br>
+      <samp>mid-chroma</samp>
+    </td>
+    <td width="148" align="center">
+      <img src="https://github.com/user-attachments/assets/f09c9416-ced4-4595-8bd0-7808599cd87b" alt="fft_high_band_terrain_spectral_flatness.png" width="142"><br>
+      <samp>high-spectral-flatness</samp>
+    </td>
+  </tr>
+  <tr>
+    <td width="148" align="center">
+      <img src="https://github.com/user-attachments/assets/6b7040e7-a58b-4fdb-a4e7-f1edc1ed73fe" alt="fft_low_band_terrain_onset_curtain.png" width="142"><br>
+      <samp>low-onset-curtains</samp>
+    </td>
+    <td width="148" align="center">
+      <img src="https://github.com/user-attachments/assets/52cee05d-8884-4395-a322-d0ccf58beb4c" alt="fft_low_band_terrain_onset_scribbles.png" width="142"><br>
+      <samp>low-onset-scribbles</samp>
+    </td>
+  </tr>
+</table>
+<br>
+
+<samp>
   &nbsp;&nbsp;&nbsp;&nbsp;[waveform terrain]<br>
   &nbsp;&nbsp;&nbsp;&nbsp;<a href="https://github.com/meisei4/fffftt/blob/main/src/waveform_terrain_3d_dc.c">src/waveform_terrain_3d_dc.c</a> ...... <b>Hilbert envelope</b>, <b>RMS</b>, and <b>onset strength</b><br>
 </samp>
@@ -26,7 +63,7 @@
   <tr>
     <td width="464" rowspan="2" align="left">
       <video src="https://github.com/user-attachments/assets/bd9c1301-2ef7-401a-9969-aa6358c36345" autoplay loop muted playsinline width="464" height="348"></video>
-      <sub><samp>audio should work^^^ otherwise: <a href="https://github.com/user-attachments/assets/bd9c1301-2ef7-401a-9969-aa6358c36345">fft-bands-terrain-3d-dc.webm</a>)</samp></sub>
+      <sub><samp>audio should work^^^ otherwise: <a href="https://github.com/user-attachments/assets/bd9c1301-2ef7-401a-9969-aa6358c36345">waveform-terrain-3d-dc.webm</a>)</samp></sub>
     </td>
     <td width="296" rowspan="2" align="center">
       <img src="https://github.com/user-attachments/assets/fea18140-8d4c-4117-9283-74b7b15742d1" alt="waveform_terrain.png" width="292"><br>
@@ -89,44 +126,6 @@
   </tr>
 </table>
 <br>
-
-<samp>
-  &nbsp;&nbsp;&nbsp;&nbsp;[fft bands terrain]<br>
-  &nbsp;&nbsp;&nbsp;&nbsp;<a href="https://github.com/meisei4/fffftt/blob/main/src/fft_bands_terrain_3d_dc.c">src/fft_bands_terrain_3d_dc.c</a> ..... FFT bands; mid: <b>chroma</b>, low: <b>onset strength</b>, high: <b>spectral flatness</b><br>
-</samp>
-
-<table width="1056">
-  <tr>
-    <td width="464" rowspan="2" align="left">
-      <video src="https://github.com/user-attachments/assets/a3d40286-c825-47b8-a23c-37da2c11104b" autoplay loop muted playsinline width="464" height="348"></video>
-      <sub><samp>audio should work^^^ otherwise: <a href="https://github.com/user-attachments/assets/a3d40286-c825-47b8-a23c-37da2c11104b">waveform-terrain-3d-dc.webm</a>)</samp></sub>
-    </td>
-    <td width="296" rowspan="2" align="center">
-      <img src="https://github.com/user-attachments/assets/87971a00-daf0-4e57-a2cc-70d343af97dd" alt="fft_bands_terrain.png" width="292"><br>
-      <samp>fft bands terrain</samp>
-    </td>
-    <td width="148" align="center">
-      <img src="https://github.com/user-attachments/assets/6bddceb9-1566-4629-9dc8-bba4da1f6e8d" alt="fft_bands_terrain_chroma.png" width="142"><br>
-      <samp>mid-chroma</samp>
-    </td>
-    <td width="148" align="center">
-      <img src="https://github.com/user-attachments/assets/f09c9416-ced4-4595-8bd0-7808599cd87b" alt="fft_high_band_terrain_spectral_flatness.png" width="142"><br>
-      <samp>high-spectral-flatness</samp>
-    </td>
-  </tr>
-  <tr>
-    <td width="148" align="center">
-      <img src="https://github.com/user-attachments/assets/6b7040e7-a58b-4fdb-a4e7-f1edc1ed73fe" alt="fft_low_band_terrain_onset_curtain.png" width="142"><br>
-      <samp>low-onset-curtains</samp>
-    </td>
-    <td width="148" align="center">
-      <img src="https://github.com/user-attachments/assets/52cee05d-8884-4395-a322-d0ccf58beb4c" alt="fft_low_band_terrain_onset_scribbles.png" width="142"><br>
-      <samp>low-onset-scribbles</samp>
-    </td>
-  </tr>
-</table>
-<br>
-
 
 ### <samp>[shadertoy ports]</samp>
 <samp>
