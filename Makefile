@@ -12,6 +12,7 @@ RAYLIB_DC_SRC_DIR := raylib_dc/src
 GLDC_BUILD_DIR := $(BUILD_DIR)/dc/gldc
 GLDC_LIB := $(GLDC_BUILD_DIR)/libGL.a
 GLDC_TOOLCHAIN := $(KOS_BASE)/utils/cmake/kallistios.toolchain.cmake
+CMAKE_GENERATOR ?= Unix Makefiles
 
 RAYLIB_DC_DIR := $(BUILD_DIR)/dc/raylib
 
@@ -190,7 +191,7 @@ $(SH4ZAM_COMPLEX_OBJ): $(SH4ZAM_COMPLEX_SRC)
 
 gldc-lib:
 	@test -f $(GLDC_DIR)/CMakeLists.txt || { echo "GLdc checkout missing at $(GLDC_DIR). Initialize the submodule first."; exit 1; }
-	cd $(GLDC_DIR) && cmake --fresh -S . -B $(abspath $(GLDC_BUILD_DIR)) -DCMAKE_TOOLCHAIN_FILE=$(GLDC_TOOLCHAIN) -DCMAKE_BUILD_TYPE=Release -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
+	cd $(GLDC_DIR) && cmake --fresh -G "$(CMAKE_GENERATOR)" -S . -B $(abspath $(GLDC_BUILD_DIR)) -DCMAKE_TOOLCHAIN_FILE=$(GLDC_TOOLCHAIN) -DCMAKE_BUILD_TYPE=Release -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
 	cmake --build $(GLDC_BUILD_DIR) --target GL --parallel
 	@test -f $(GLDC_LIB)
 

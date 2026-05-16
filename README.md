@@ -230,16 +230,17 @@ git submodule update --init --recursive
 
 ```bash
 # [fft]
-make sh4zam-butterfly             # run: ./bin/sh4zam_butterfly
-make picking-out-notes-dc         # run: ./bin/picking_out_notes_dc
-make fft-terrain-3d-dc            # run: ./bin/fft_terrain_3d_dc
-make fft-bands-terrain-3d-dc      # run: ./bin/fft_bands_terrain_3d_dc
+# [fft]
+make sh4zam-butterfly             # run: ./bin/sh4zam_butterfly        # elf: ./build/dc/sh4zam_butterfly/sh4zam_butterfly.elf
+make picking-out-notes-dc         # run: ./bin/picking_out_notes_dc    # elf: ./build/dc/picking_out_notes_dc/picking_out_notes_dc.elf
+make fft-terrain-3d-dc            # run: ./bin/fft_terrain_3d_dc       # elf: ./build/dc/fft_terrain_3d_dc/fft_terrain_3d_dc.elf
+make fft-bands-terrain-3d-dc      # run: ./bin/fft_bands_terrain_3d_dc # elf: ./build/dc/fft_bands_terrain_3d_dc/fft_bands_terrain_3d_dc.elf
 
 # [waveform]
-make waveform-dc                  # run: ./bin/waveform_dc
-make sound-envelope-2d-iso-dc     # run: ./bin/sound_envelope_2d_iso_dc
-make sound-envelope-3d-dc         # run: ./bin/sound_envelope_3d_dc
-make waveform-terrain-3d-dc       # run: ./bin/waveform_terrain_3d_dc
+make waveform-dc                  # run: ./bin/waveform_dc             # elf: ./build/dc/waveform_dc/waveform_dc.elf
+make sound-envelope-2d-iso-dc     # run: ./bin/sound_envelope_2d_iso_dc # elf: ./build/dc/sound_envelope_2d_iso_dc/sound_envelope_2d_iso_dc.elf
+make sound-envelope-3d-dc         # run: ./bin/sound_envelope_3d_dc    # elf: ./build/dc/sound_envelope_3d_dc/sound_envelope_3d_dc.elf
+make waveform-terrain-3d-dc       # run: ./bin/waveform_terrain_3d_dc  # elf: ./build/dc/waveform_terrain_3d_dc/waveform_terrain_3d_dc.elf
 ```
 
 

@@ -9,6 +9,11 @@ log_file_path="${FLYCAST_LOG_PATH:-logs/flycast_run.log}"
 mkdir -p logs
 
 emu_bin="${FLYCAST_BIN:-flycast}"
+if ! command -v "$emu_bin" >/dev/null 2>&1 && [ ! -x "$emu_bin" ]; then
+  echo "flycast not found: $emu_bin" >&2
+  echo "set FLYCAST_BIN to where you keep flycast executable" >&2
+  exit 127
+fi
 emu_extra_args="${FLYCAST_EXTRA_ARGS:-}"
 window_width="${FLYCAST_WINDOW_WIDTH:-640}"
 window_height="${FLYCAST_WINDOW_HEIGHT:-480}"
@@ -53,7 +58,7 @@ flycast_config_args=(
 )
 
 SDL_VIDEO_HIGHDPI_DISABLED="${SDL_VIDEO_HIGHDPI_DISABLED:-1}" \
-  $emu_bin $emu_extra_args "${flycast_config_args[@]}" "$@" "${content_path}" > "$log_file_path" 2>&1 &
+  "$emu_bin" $emu_extra_args "${flycast_config_args[@]}" "$@" "${content_path}" > "$log_file_path" 2>&1 &
 flycast_process_id=$!
 tail -f "$log_file_path" &
 log_tail_process_id=$!

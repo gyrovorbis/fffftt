@@ -4,7 +4,7 @@
 	branch = raylib4Consoles_6.0
 [submodule "GLdc"]
 	path = GLdc
-	url = git@gitlab.com:meisei4/GLdc.git
+	url = https://gitlab.com/meisei4/GLdc.git
 	;branch = master ; this is 64 byte vertex + polygonMode/misc-patches
 	branch = demo-32-byte-vertex
 [submodule "sh4zam"]
