@@ -6,7 +6,7 @@
 
 
 <samp>[overview]<br>
-  &nbsp;&nbsp;&nbsp;&nbsp;.h file ........................... shared prototypes/functions in <a href="https://github.com/meisei4/fffftt/blob/main/src/fffftt.h">src/fffftt.h</a><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;.h file ........................... shared state/functions in <a href="https://github.com/meisei4/fffftt/blob/main/src/fffftt.h">src/fffftt.h</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;.c files .......................... one demo per file in <a href="https://github.com/meisei4/fffftt/tree/main/src">src/</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;.wav files ........................ <a href="https://shadertoyunofficial.wordpress.com/2019/07/23/shadertoy-media-files/">Shadertoy media files</a> -> ADPCM .wavs in <a href="https://github.com/meisei4/fffftt/tree/main/src/resources">src/resources/</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;controls .......................... cycle tracks, pause/seek/resume, move light<br><!-- TODO: add a nice control scheme for gamepad-->
@@ -25,8 +25,8 @@
 <table width="1056">
   <tr>
     <td width="464" rowspan="2" align="left">
-      <video src="https://github.com/user-attachments/assets/a3d40286-c825-47b8-a23c-37da2c11104b" autoplay loop muted playsinline width="464" height="348"></video>
-      <sub><samp>audio should work^^^ otherwise: <a href="https://github.com/user-attachments/assets/a3d40286-c825-47b8-a23c-37da2c11104b">fft-bands-terrain-3d-dc.webm</a>)</samp></sub>
+      <video src="https://github.com/user-attachments/assets/1b565324-2215-4617-b18e-c2b5907ca511" autoplay loop muted playsinline width="464" height="348"></video>
+      <sub><samp>audio should work^^^ otherwise: <a href="https://github.com/user-attachments/assets/1b565324-2215-4617-b18e-c2b5907ca511">fft-bands-terrain-3d-dc.webm</a>)</samp></sub>
     </td>
     <td width="296" rowspan="2" align="center">
       <img src="https://github.com/user-attachments/assets/87971a00-daf0-4e57-a2cc-70d343af97dd" alt="fft_bands_terrain.png" width="292"><br>
@@ -62,8 +62,8 @@
 <table width="1056">
   <tr>
     <td width="464" rowspan="2" align="left">
-      <video src="https://github.com/user-attachments/assets/bd9c1301-2ef7-401a-9969-aa6358c36345" autoplay loop muted playsinline width="464" height="348"></video>
-      <sub><samp>audio should work^^^ otherwise: <a href="https://github.com/user-attachments/assets/bd9c1301-2ef7-401a-9969-aa6358c36345">waveform-terrain-3d-dc.webm</a>)</samp></sub>
+      <video src="https://github.com/user-attachments/assets/ad3e7dea-b1f2-4c4e-a2ea-4c5d2851af92" autoplay loop muted playsinline width="464" height="348"></video>
+      <sub><samp>audio should work^^^ otherwise: <a href="https://github.com/user-attachments/assets/ad3e7dea-b1f2-4c4e-a2ea-4c5d2851af92">waveform-terrain-3d-dc.webm</a>)</samp></sub>
     </td>
     <td width="296" rowspan="2" align="center">
       <img src="https://github.com/user-attachments/assets/fea18140-8d4c-4117-9283-74b7b15742d1" alt="waveform_terrain.png" width="292"><br>
@@ -99,8 +99,8 @@
 <table width="1056">
   <tr>
     <td width="464" rowspan="2" align="left">
-      <video src="https://github.com/user-attachments/assets/10ededf9-a84c-4453-9467-b5b14c48c159" autoplay loop muted playsinline width="464" height="348"></video>
-      <sub><samp>audio should work^^^ otherwise: <a href="https://github.com/user-attachments/assets/10ededf9-a84c-4453-9467-b5b14c48c159">fft-terrain-3d-dc.webm</a>)</samp></sub>
+      <video src="https://github.com/user-attachments/assets/cd5b79e5-c9be-4a00-a65d-65dc8482569c" autoplay loop muted playsinline width="464" height="348"></video>
+      <sub><samp>audio should work^^^ otherwise: <a href="https://github.com/user-attachments/assets/cd5b79e5-c9be-4a00-a65d-65dc8482569c">fft-terrain-3d-dc.webm</a>)</samp></sub>
     </td>
     <td width="296" rowspan="2" align="center">
       <img src="https://github.com/user-attachments/assets/5a220009-1159-43a5-9bc0-177c611bc6a4" alt="fft_terrain.png" width="292"><br>
@@ -140,10 +140,10 @@
   </tr>
   <tr>
     <td width="464" align="center">
-      <video src="https://github.com/user-attachments/assets/358c96bd-2520-42e1-acb0-8aec52358ad5" autoplay loop muted playsinline width="464" height="261"></video><br>
+      <video src="https://github.com/user-attachments/assets/5ae63435-af8d-43d6-ad17-4fd3561f9044" autoplay loop muted playsinline width="464" height="261"></video><br>
     </td>
     <td width="464" align="center">
-      <video src="https://github.com/user-attachments/assets/9538fb97-79ec-434c-b659-74deec5030a3" autoplay loop muted playsinline width="464" height="261"></video><br>
+      <video src="https://github.com/user-attachments/assets/6307767e-6daa-4373-b82d-ea3874780da1" autoplay loop muted playsinline width="464" height="261"></video><br>
     </td>
   </tr>
 </table>
@@ -161,10 +161,10 @@
   </tr>
   <tr>
     <td width="464" align="center">
-      <video src="https://github.com/user-attachments/assets/f942edb3-cb31-4095-851c-5b907f006d29" autoplay loop muted playsinline width="464" height="261"></video><br>
+      <video src="https://github.com/user-attachments/assets/7ea166a4-ad9a-4b63-bc0d-38deca84fe7d" autoplay loop muted playsinline width="464" height="261"></video><br>
     </td>
     <td width="464" align="center">
-      <video src="https://github.com/user-attachments/assets/ff68e8b7-095f-4a61-b838-3e82e0a52e5d" autoplay loop muted playsinline width="464" height="261"></video><br>
+      <video src="https://github.com/user-attachments/assets/585d6fdc-e112-4abf-b1d5-6ca5e61e10fc" autoplay loop muted playsinline width="464" height="261"></video><br>
     </td>
   </tr>
 </table>
@@ -182,39 +182,34 @@
   </tr>
   <tr>
     <td width="464" align="center">
-      <video src="https://github.com/user-attachments/assets/9dab963d-eabd-40d1-b541-5c6f3e64c544" autoplay loop muted playsinline width="464" height="261"></video><br>
+      <video src="https://github.com/user-attachments/assets/e5b5b2c4-6591-4bec-a266-483c9039ba99" autoplay loop muted playsinline width="464" height="261"></video><br>
     </td>
     <td width="464" align="center">
-      <video src="https://github.com/user-attachments/assets/df219ba5-18be-4a7e-a023-edb22fd3e6ea" autoplay loop muted playsinline width="464" height="261"></video><br>
+      <video src="https://github.com/user-attachments/assets/30336a15-8fbd-474a-a6d1-4a0be1c7f44c" autoplay loop muted playsinline width="464" height="261"></video><br>
     </td>
   </tr>
 </table>
 <br>
-
 <samp>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[meisei4: sound envelope reference]<br>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Shadertoy: <a href="https://www.shadertoy.com/view/7fXSWB">https://www.shadertoy.com/view/7fXSWB</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;src: <a href="https://github.com/meisei4/fffftt/blob/main/src/sound_envelope_2d_iso_dc.c">src/sound_envelope_2d_iso_dc.c</a> / <a href="https://github.com/meisei4/fffftt/blob/main/src/sound_envelope_3d_dc.c">src/sound_envelope_3d_dc.c</a><br>
 </samp>
-<table width="928">
+<table width="927">
   <tr>
-    <td width="232" align="center"><samp>Dreamcast 2D</samp></td>
-    <td width="232" align="center"><samp>Dreamcast 3D</samp></td>
-    <td width="232" align="center"><samp>GL33 capture</samp></td>
-    <td width="232" align="center"><samp>Shadertoy capture</samp></td>
+    <td width="309" align="center"><samp>Dreamcast 2D</samp></td>
+    <td width="309" align="center"><samp>Dreamcast 3D</samp></td>
+    <td width="309" align="center"><samp>Shadertoy capture</samp></td>
   </tr>
   <tr>
-    <td width="232" align="center">
-      <video src="https://github.com/user-attachments/assets/ac36e5e0-c8a5-42bc-aa92-9303712dc4a7" autoplay loop muted playsinline width="232" height="131"></video><br>
+    <td width="309" align="center">
+      <video src="https://github.com/user-attachments/assets/2ebd79ba-88e6-480b-b582-8af83984047b" autoplay loop muted playsinline width="309" height="174"></video><br>
     </td>
-    <td width="232" align="center">
-      <video src="https://github.com/user-attachments/assets/d9d90e0c-82a5-44ed-a485-5b57db02a299" autoplay loop muted playsinline width="232" height="131"></video><br>
+    <td width="309" align="center">
+      <video src="https://github.com/user-attachments/assets/2e76902a-c7d0-4699-8088-43c411da253f" autoplay loop muted playsinline width="309" height="174"></video><br>
     </td>
-    <td width="232" align="center">
-      <video src="https://github.com/user-attachments/assets/d34794b5-c1d7-47bd-9e90-fc808389ccb4" autoplay loop muted playsinline width="232" height="131"></video><br>
-    </td>
-    <td width="232" align="center">
-      <video src="https://github.com/user-attachments/assets/71ac43c5-8667-4efa-9bea-558f183f5602" autoplay loop muted playsinline width="232" height="131"></video><br>
+    <td width="309" align="center">
+      <video src="https://github.com/user-attachments/assets/9f779cbc-380e-4335-bbba-8880347f82e5" autoplay loop muted playsinline width="309" height="174"></video><br>
     </td>
   </tr>
 </table>
