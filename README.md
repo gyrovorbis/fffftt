@@ -253,7 +253,8 @@ make dc-waveform-terrain-3d       # run: ./bin/dc/waveform-terrain-3d       # el
 &nbsp;&nbsp;&nbsp;&nbsp;[DPAD] ....................... orbit camera&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ARROW KEYS] ................... orbit camera<br>
 &nbsp;&nbsp;&nbsp;&nbsp;[START] ...................... pause/resume&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ENTER] ........................ pause/resume<br>
 &nbsp;&nbsp;&nbsp;&nbsp;[B]/[A] ...................... seek cursor&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[C]/[X] ........................ seek cursor<br>
-&nbsp;&nbsp;&nbsp;&nbsp;[START]+[A] .................. exit&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ESC] .......................... exit<br><br>
+&nbsp;&nbsp;&nbsp;&nbsp;[START]+[A] .................. exit&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ESC] .......................... exit<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[START]+[B] .................. initiate disc swap<br><br>
 </samp>
 
 

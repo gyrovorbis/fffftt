@@ -71,6 +71,9 @@ int main(void) {
         }
 
         update_audio_track_cycle();
+
+        if (cdda_state != CDDA_STATE_NONE && cdda_state != CDDA_STATE_CDROM_READY)
+            goto playback_controls_skip; // for fun
         if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) || IsKeyPressed(KEY_ENTER)) {
             reset_sticky_nav();
 
@@ -99,6 +102,7 @@ int main(void) {
             fffftt_inspection_fill_analysis_window(wave_cursor);
         }
 
+    playback_controls_skip:
         while (fffftt_audio_process(chunk_samples)) {
         }
 
@@ -127,5 +131,9 @@ int main(void) {
     CloseAudioDevice();
     UnloadFont(font);
     CloseWindow();
+#ifdef PLATFORM_DREAMCAST
+    arch_exit();
+#else
     return 0;
+#endif
 }

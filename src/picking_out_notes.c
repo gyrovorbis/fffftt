@@ -160,5 +160,9 @@ int main(void) {
     RL_FREE(fft_data.work_buffer);
     UnloadFont(font);
     CloseWindow();
+#ifdef PLATFORM_DREAMCAST
+    arch_exit();
+#else
     return 0;
+#endif
 }

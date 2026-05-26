@@ -317,7 +317,11 @@ int main(void) {
     RL_FREE(fft_data.work_buffer);
     UnloadFont(font);
     CloseWindow();
+#ifdef PLATFORM_DREAMCAST
+    arch_exit();
+#else
     return 0;
+#endif
 }
 
 static float low_band_adaptive_peak = 0.0f;
@@ -428,6 +432,9 @@ static void consume_current_fft_frame(void) {
 
 static void update_playback_controls_fft(void) {
     int analysis_dirty = 0;
+    if (cdda_state != CDDA_STATE_NONE && cdda_state != CDDA_STATE_CDROM_READY) {
+        return;
+    }
 
     if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) || IsKeyPressed(KEY_ENTER)) {
         reset_sticky_nav();

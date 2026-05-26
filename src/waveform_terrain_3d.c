@@ -206,7 +206,11 @@ int main(void) {
     CloseAudioDevice();
     UnloadFont(font);
     CloseWindow();
+#ifdef PLATFORM_DREAMCAST
+    arch_exit();
+#else
     return 0;
+#endif
 }
 
 static void init_hilbert_filter(void) {
@@ -540,6 +544,9 @@ static void update_waveform_terrain_meshes(void) {
 
 static void update_playback_controls_waveform(void) {
     int analysis_dirty = 0;
+    if (cdda_state != CDDA_STATE_NONE && cdda_state != CDDA_STATE_CDROM_READY) {
+        return;
+    }
 
     if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) || IsKeyPressed(KEY_ENTER)) {
         reset_sticky_nav();

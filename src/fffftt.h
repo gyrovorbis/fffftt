@@ -15,6 +15,9 @@
 #include <dc/perfctr.h>
 #include <kos/fs.h>
 #include <fcntl.h>
+#include <dc/cdrom.h>
+#include <dc/fs_iso9660.h>
+#include <arch/arch.h>
 
 //TODO: investigate orbital camera!!!!
 #define SINF(x) shz_sinf((x))
@@ -1263,8 +1266,83 @@ static inline void adpcm_save_checkpoint(void) {
     adpcm_checkpoint_filled_count = MAXI(adpcm_checkpoint_filled_count, checkpoint_index + 1);
 }
 
+#define CDDA_STATE_NONE 0
+#define CDDA_STATE_AWAIT_DISC_REMOVAL 1
+#define CDDA_STATE_AWAIT_DISC_INSERT 2
+#define CDDA_STATE_CDROM_READY 3
+
+static int cdda_state = CDDA_STATE_NONE;
+static const char* cdda_hud_status_text = "CDDA OFF";
+
+#define CDROM_RAW_SECTOR_SIZE 2352
+#define CDDA_STEREO_FRAMES_PER_SECTOR 588
+#define CDDA_MONO_FRAMES_PER_SECTOR (CDDA_STEREO_FRAMES_PER_SECTOR / 2)
+#define CDDA_RAW_SECTOR_SAMPLE_COUNT (CDROM_RAW_SECTOR_SIZE / sizeof(int16_t))
+#define CDDA_AUDIO_TRACK_COUNT_MAX 99
+
+static int audio_track_index = 0;
+static int cdda_track_count = 0;
+static uint32_t cdda_track_start_fads[CDDA_AUDIO_TRACK_COUNT_MAX] = {0};
+static uint32_t cdda_track_end_fads[CDDA_AUDIO_TRACK_COUNT_MAX] = {0};
+static int16_t cdda_mono_sample_cache[CDDA_MONO_FRAMES_PER_SECTOR] = {0};
+static int16_t cdrom_raw_sector_samples[CDDA_RAW_SECTOR_SAMPLE_COUNT] = {0};
+
+#ifdef PLATFORM_DREAMCAST
+static inline int cdrom_read_next_raw_sector(uint32_t* next_sector_fad) {
+    if (*next_sector_fad >= cdda_track_end_fads[audio_track_index]) {
+        *next_sector_fad = cdda_track_start_fads[audio_track_index];
+    }
+    int read_result = cdrom_read_sectors_ex(cdrom_raw_sector_samples, *next_sector_fad, 1, false);
+    if (read_result != ERR_OK) {
+        return 0;
+    }
+    for (int i = 0; i < CDDA_MONO_FRAMES_PER_SECTOR; i++) {
+        const int16_t* src = cdrom_raw_sector_samples + (i * 4);
+        int mixed_sample = src[0] + src[1] + src[2] + src[3];
+        cdda_mono_sample_cache[i] = mixed_sample / 4;
+    }
+    (*next_sector_fad)++;
+    return 1;
+}
+#endif // PLATFORM_DREAMCAST
+
 static inline void fffftt_file_io_seek_read(int16_t* dst, int pos, int frame_count) {
     int src_pos = WRAP(pos, wave.frameCount);
+#ifdef PLATFORM_DREAMCAST
+    if (cdda_state == CDDA_STATE_CDROM_READY) {
+        uint32_t track_start_fad = cdda_track_start_fads[audio_track_index];
+        uint32_t sector_offset = (uint32_t)(src_pos / CDDA_MONO_FRAMES_PER_SECTOR);
+        uint32_t next_sector_fad = track_start_fad + sector_offset;
+        int skip_count = src_pos % CDDA_MONO_FRAMES_PER_SECTOR;
+        int cache_pos = 0;
+        int cache_ready = 0;
+        int write_count = 0;
+        if (next_sector_fad >= cdda_track_end_fads[audio_track_index]) {
+            next_sector_fad = track_start_fad;
+            skip_count = 0;
+        }
+        if (skip_count > 0 && cdrom_read_next_raw_sector(&next_sector_fad)) {
+            cache_pos = skip_count;
+            cache_ready = 1;
+        }
+        while (write_count < frame_count) {
+            if (!cache_ready || cache_pos >= CDDA_MONO_FRAMES_PER_SECTOR) {
+                if (!cdrom_read_next_raw_sector(&next_sector_fad)) {
+                    while (write_count < frame_count) {
+                        dst[write_count++] = 0;
+                    }
+                    return;
+                }
+                cache_pos = 0;
+                cache_ready = 1;
+            }
+            while (write_count < frame_count && cache_pos < CDDA_MONO_FRAMES_PER_SECTOR) {
+                dst[write_count++] = cdda_mono_sample_cache[cache_pos++];
+            }
+        }
+        return;
+    }
+#endif // PLATFORM_DREAMCAST
     int write_count = 0;
     while (write_count < frame_count) {
         if (src_pos < adpcm_decode_frame) {
@@ -1297,6 +1375,9 @@ static inline void fffftt_file_io_seek_read(int16_t* dst, int pos, int frame_cou
 //  about adpcm and other tricks in dreamcast auduio domain... it feels very important to learn this stuff.
 static inline int fffftt_audio_process(int16_t* audio_period_pcm16) {
     if (is_paused || !IsAudioStreamProcessed(audio_stream)) {
+        return 0;
+    }
+    if (cdda_state != CDDA_STATE_NONE && cdda_state != CDDA_STATE_CDROM_READY) {
         return 0;
     }
     fffftt_file_io_seek_read(audio_period_pcm16, wave_cursor, AUDIO_DEVICE_PERIOD_SIZE_IN_FRAMES);
@@ -1354,7 +1435,6 @@ static inline float fffftt_accumulate_sound_envelope(int pos, int frame_count) {
      : (track_index) == SHADERTOY_GEOMETRIC_PERSON ? SHADERTOY_GEOMETRIC_PERSON_22K_WAV                                                                        \
      : (track_index) == SHADERTOY_TROPICAL         ? SHADERTOY_TROPICAL_22K_WAV                                                                                \
                                                    : SHADERTOY_XTRACK_22K_WAV)
-static int audio_track_index = SHADERTOY_EXPERIMENT;
 
 static inline void unload_audio_track(void) {
     RL_FREE(adpcm_checkpoint_history);
@@ -1374,6 +1454,20 @@ static inline void unload_audio_track(void) {
 }
 
 static inline void set_audio_track(int track_index) {
+    if (cdda_state == CDDA_STATE_CDROM_READY) {
+        audio_track_index = WRAP(track_index, cdda_track_count);
+        wave = (Wave){
+            .frameCount = (unsigned int)((cdda_track_end_fads[audio_track_index] - cdda_track_start_fads[audio_track_index]) * CDDA_MONO_FRAMES_PER_SECTOR),
+            .sampleRate = SRC_SAMPLE_RATE,
+            .sampleSize = SRC_BIT_DEPTH,
+            .channels = SRC_CHANNELS,
+            .data = NULL,
+        };
+        wave_cursor = 0;
+        paused_wave_cursor = 0;
+        seek_delta_chunks = 0;
+        return;
+    }
     if (src_file) {
         unload_audio_track();
     }
@@ -1394,6 +1488,171 @@ static inline void set_audio_track(int track_index) {
     wave_cursor = 0;
 }
 
+#ifdef PLATFORM_DREAMCAST
+#define CDDA_STATE(state_)                                                                                                                                     \
+    ((state_) == CDDA_STATE_NONE                 ? "NONE"                                                                                                      \
+     : (state_) == CDDA_STATE_AWAIT_DISC_REMOVAL ? "AWAIT_DISC_REMOVAL"                                                                                        \
+     : (state_) == CDDA_STATE_AWAIT_DISC_INSERT  ? "AWAIT_DISC_INSERT"                                                                                         \
+     : (state_) == CDDA_STATE_CDROM_READY        ? "CDROM_READY"                                                                                               \
+                                                 : "UNSUPPORTED_CDDA_STATE")
+
+#define CD_STATUS(status_)                                                                                                                                     \
+    ((status_) == CD_STATUS_BUSY       ? "BUSY"                                                                                                                \
+     : (status_) == CD_STATUS_PAUSED   ? "PAUSED"                                                                                                              \
+     : (status_) == CD_STATUS_STANDBY  ? "STANDBY"                                                                                                             \
+     : (status_) == CD_STATUS_OPEN     ? "OPEN"                                                                                                                \
+     : (status_) == CD_STATUS_NO_DISC  ? "NO_DISC"                                                                                                             \
+     : (status_) == CD_STATUS_SEEKING  ? "SEEKING"                                                                                                             \
+     : (status_) == CD_STATUS_SCANNING ? "SCANNING"                                                                                                            \
+                                       : "UNSUPPORTED_CD_STATUS")
+
+#define DISC_TYPE(disc_type_)                                                                                                                                  \
+    ((disc_type_) == CD_CDDA       ? "CDDA"                                                                                                                    \
+     : (disc_type_) == CD_CDROM    ? "CDROM"                                                                                                                   \
+     : (disc_type_) == CD_CDROM_XA ? "CDROM_XA"                                                                                                                \
+     : (disc_type_) == CD_GDROM    ? "GDROM"                                                                                                                   \
+                                   : "UNSUPPORTED_DISC_TYPE")
+
+static inline void cdda_read_toc(void) {
+    if (cdrom_reinit_ex(CDROM_READ_WHOLE_SECTOR, 0, CDROM_RAW_SECTOR_SIZE) != ERR_OK) {
+        cdda_hud_status_text = "CDDA: TRY ANOTHER DISC";
+        return;
+    }
+    cd_toc_t toc = {0};
+    if (cdrom_read_toc(&toc, false) != ERR_OK) {
+        cdda_hud_status_text = "CDDA: TRY ANOTHER DISC";
+        return;
+    }
+    int first_track = TOC_TRACK(toc.first);
+    int last_track = TOC_TRACK(toc.last);
+    cdda_track_count = 0;
+    for (int track = first_track; track <= last_track; track++) {
+        uint32_t entry = toc.entry[track - 1];
+        int ctrl = TOC_CTRL(entry);
+        if (ctrl == 4) {
+            continue;
+        }
+        if (cdda_track_count >= CDDA_AUDIO_TRACK_COUNT_MAX) {
+            break;
+        }
+        cdda_track_start_fads[cdda_track_count] = TOC_LBA(entry);
+        cdda_track_end_fads[cdda_track_count] = (track < last_track) ? TOC_LBA(toc.entry[track]) : TOC_LBA(toc.leadout_sector);
+        cdda_track_count++;
+    }
+    if (cdda_track_count == 0) {
+        cdda_hud_status_text = "CDDA: TRY ANOTHER DISC";
+        return;
+    }
+    cdda_state = CDDA_STATE_CDROM_READY;
+    set_audio_track(0);
+}
+
+static inline void cdda_disc_swap_begin(void) {
+    PauseAudioStream(audio_stream);
+    // TODO: i dont think i like strcmp, but compile flag redesign is trade off...
+    if (strcmp(AUDIO_ASSET_PATH_PREFIX, "/rd/")) {
+        unload_audio_track(); // avoid risking double free so just keep it always resident for romdisk builds
+    }
+    cdda_state = CDDA_STATE_AWAIT_DISC_REMOVAL;
+    cdda_track_count = 0;
+    wave = (Wave){0};
+    wave_cursor = 0;
+    paused_wave_cursor = 0;
+    seek_delta_chunks = 0;
+    is_paused = true;
+    reset_sticky_nav();
+    iso_reset();
+    cdda_hud_status_text = "CDDA: REMOVE DISC";
+}
+
+static inline void cdda_state_update(void) {
+    static int restore_audio_track_index = SHADERTOY_EXPERIMENT;
+    if ((cdda_state == CDDA_STATE_NONE || cdda_state == CDDA_STATE_CDROM_READY) && IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) &&
+        IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
+        if (cdda_state == CDDA_STATE_NONE) {
+            restore_audio_track_index = audio_track_index;
+        }
+        cdda_disc_swap_begin();
+        return;
+    }
+    if (cdda_state != CDDA_STATE_AWAIT_DISC_REMOVAL && cdda_state != CDDA_STATE_AWAIT_DISC_INSERT) {
+        return;
+    }
+    int status = 0;
+    int disc_type = 0;
+    if (cdrom_get_status(&status, &disc_type) != ERR_OK) {
+        cdda_hud_status_text = "CDDA: TRY ANOTHER DISC";
+        return;
+    }
+    static int prev_status = -1;
+    static int prev_disc_type = -1;
+    static int prev_cdda_state = -1;
+    if (status != prev_status || disc_type != prev_disc_type || cdda_state != prev_cdda_state) {
+        char timestamp[LOG_TIMESTAMP_SIZE];
+        FORMAT_MMSSMMM(timestamp, (int)(GetTime() * (float)MILLISECONDS_PER_SECOND));
+        TraceLog(LOG_INFO,
+                 "[%s] CDDA state=%s status=%s disc_type=%s prev_state=%s prev_status=%s prev_disc_type=%s",
+                 timestamp,
+                 CDDA_STATE(cdda_state),
+                 CD_STATUS(status),
+                 DISC_TYPE(disc_type),
+                 CDDA_STATE(prev_cdda_state),
+                 CD_STATUS(prev_status),
+                 DISC_TYPE(prev_disc_type));
+        prev_status = status;
+        prev_disc_type = disc_type;
+        prev_cdda_state = cdda_state;
+    }
+    if (cdda_state == CDDA_STATE_AWAIT_DISC_REMOVAL) {
+        if (status == CD_STATUS_OPEN || status == CD_STATUS_NO_DISC) {
+            cdda_state = CDDA_STATE_AWAIT_DISC_INSERT;
+            cdda_hud_status_text = "CDDA: INSERT DISC";
+            return;
+        }
+        cdda_hud_status_text = "CDDA: REMOVE DISC";
+        return;
+    }
+    if (status == CD_STATUS_OPEN || status == CD_STATUS_NO_DISC) {
+        cdda_hud_status_text = "CDDA: INSERT DISC";
+        return;
+    }
+    if (status == CD_STATUS_BUSY || status == CD_STATUS_SEEKING || status == CD_STATUS_SCANNING) {
+        cdda_hud_status_text = "CDDA: AWAIT DISC";
+        return;
+    }
+    if (status == CD_STATUS_PAUSED || status == CD_STATUS_STANDBY) {
+        if (disc_type == CD_CDDA) {
+            cdda_read_toc();
+            if (cdda_state == CDDA_STATE_CDROM_READY) {
+                is_paused = false;
+                PlayAudioStream(audio_stream);
+            }
+            return;
+        }
+        if (disc_type == CD_CDROM || disc_type == CD_CDROM_XA || disc_type == CD_GDROM) {
+            if (cdrom_reinit() != ERR_OK) {
+                cdda_hud_status_text = "CDDA: AWAIT DISC";
+                return;
+            }
+            iso_reset();
+            cdda_track_count = 0;
+            cdda_state = CDDA_STATE_NONE;
+            set_audio_track(restore_audio_track_index);
+            wave_cursor = 0;
+            paused_wave_cursor = 0;
+            seek_delta_chunks = 0;
+            is_paused = false;
+            reset_sticky_nav();
+            PlayAudioStream(audio_stream);
+            return;
+        }
+        cdda_hud_status_text = "CDDA: TRY ANOTHER DISC";
+        return;
+    }
+    cdda_hud_status_text = "CDDA: AWAIT DISC";
+}
+#endif // PLATFORM_DREAMCAST
+
 static inline void update_audio_track_cycle(void) {
     int dir = 0;
     if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT) || IsKeyPressed(KEY_S)) {
@@ -1401,6 +1660,22 @@ static inline void update_audio_track_cycle(void) {
     } else if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_RIGHT_FACE_UP) || IsKeyPressed(KEY_D)) {
         dir = FORWARD;
     }
+#ifdef PLATFORM_DREAMCAST
+    cdda_state_update();
+    if (cdda_state != CDDA_STATE_NONE && cdda_state != CDDA_STATE_CDROM_READY) {
+        return;
+    }
+    if (cdda_state == CDDA_STATE_CDROM_READY) {
+        if (dir == 0) {
+            return;
+        }
+        set_audio_track(audio_track_index + dir);
+        is_paused = false;
+        reset_sticky_nav();
+        PlayAudioStream(audio_stream);
+        return;
+    }
+#endif // PLATFORM_DREAMCAST
     if (dir == 0) {
         return;
     }
@@ -1553,14 +1828,25 @@ static void draw_playback_inspection_hud(void) {
     DrawTextEx(font, "]", (Vector2){533.0f + 20.0f + (float)(state_len + 1) * 7.0f, 25.0f}, FONT_SIZE, 0.0f, hud_color);
 
     DrawTextEx(font, TextFormat("%2i FPS", GetFPS()), (Vector2){50.0f, 440.0f}, FONT_SIZE, 0.0f, WHITE);
-    DrawTextEx(font,
-               TextFormat("TRACK [%d/%d]: %s", audio_track_index, AUDIO_TRACK_COUNT - 1, AUDIO_TRACK_PATH(audio_track_index)),
-               (Vector2){7.0f + 20.0f, 25.0f + FONT_SIZE},
-               FONT_SIZE,
-               0.0f,
-               MARINER);
+    if (cdda_state == CDDA_STATE_CDROM_READY) {
+        DrawTextEx(font,
+                   TextFormat("CDDA: TRACK %d/%d", audio_track_index + 1, cdda_track_count),
+                   (Vector2){7.0f + 20.0f, 25.0f + FONT_SIZE},
+                   FONT_SIZE,
+                   0.0f,
+                   MARINER);
+    } else if (cdda_state != CDDA_STATE_NONE) {
+        DrawTextEx(font, cdda_hud_status_text, (Vector2){7.0f + 20.0f, 25.0f + FONT_SIZE}, FONT_SIZE, 0.0f, MARINER);
+    } else {
+        DrawTextEx(font,
+                   TextFormat("TRACK [%d/%d]: %s", audio_track_index, AUDIO_TRACK_COUNT - 1, AUDIO_TRACK_PATH(audio_track_index)),
+                   (Vector2){7.0f + 20.0f, 25.0f + FONT_SIZE},
+                   FONT_SIZE,
+                   0.0f,
+                   MARINER);
+    }
 
-    if (is_paused) {
+    if (is_paused && (cdda_state == CDDA_STATE_NONE || cdda_state == CDDA_STATE_CDROM_READY)) {
         draw_hud_text(seek_delta_chunks > 4 ? " > [...]" : "   [...]",
                       376.0f + -4.0f * 7.0f,
                       352.0f - 5.0f,
@@ -1593,6 +1879,9 @@ static void draw_playback_inspection_hud(void) {
 }
 
 static void update_playback_controls_sound_envelope(void) {
+    if (cdda_state != CDDA_STATE_NONE && cdda_state != CDDA_STATE_CDROM_READY) {
+        return;
+    }
     if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) || IsKeyPressed(KEY_ENTER)) {
         reset_sticky_nav();
         if (!is_paused) {
@@ -1620,6 +1909,9 @@ static void update_playback_controls_sound_envelope(void) {
 }
 
 static void update_playback_controls_fft_spectrum(void) {
+    if (cdda_state != CDDA_STATE_NONE && cdda_state != CDDA_STATE_CDROM_READY) {
+        return;
+    }
     if (IsGamepadButtonPressed(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) || IsKeyPressed(KEY_ENTER)) {
         reset_sticky_nav();
 

@@ -96,5 +96,9 @@ int main(void) {
     CloseAudioDevice();
     UnloadFont(font);
     CloseWindow();
+#ifdef PLATFORM_DREAMCAST
+    arch_exit();
+#else
     return 0;
+#endif
 }
