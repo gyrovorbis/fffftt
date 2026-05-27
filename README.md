@@ -21,7 +21,7 @@
 ### <samp>[audio terrain]</samp>
 <samp>
   &nbsp;&nbsp;&nbsp;&nbsp;[fft bands terrain]<br>
-  &nbsp;&nbsp;&nbsp;&nbsp;<a href="https://github.com/meisei4/fffftt/blob/main/src/fft_bands_terrain_3d.c">src/fft_bands_terrain_3d.c</a> ........ FFT bands; mid: <b>chroma</b>, low: <b>onset strength</b>, high: <b>spectral flatness</b><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<a href="https://github.com/meisei4/fffftt/blob/main/src/fft_bands_terrain_3d.c">src/fft_bands_terrain_3d.c</a> ........ mid: <b>chroma</b>, low: <b>onset strength</b>, high: <b>spectral flatness</b><br>
 </samp>
 
 <table width="1056">
@@ -246,14 +246,14 @@ make dc-waveform-terrain-3d       # run: ./bin/dc/waveform-terrain-3d       # el
 
 ### <samp>[controls]</samp>
 <samp>
-&nbsp;&nbsp;&nbsp;&nbsp;[dreamcast]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[desktop]<br>
-&nbsp;&nbsp;&nbsp;&nbsp;[LT]/[RT] .................... zoom out/in&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[F]/[V] ........................ zoom in/out<br>
-&nbsp;&nbsp;&nbsp;&nbsp;[ANALOG STICK] ............... lamp strafe&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[J]/[L] [I]/[K] ................ lamp strafe<br>
-&nbsp;&nbsp;&nbsp;&nbsp;[X]/[Y] ...................... cycle tracks&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[S]/[D] ........................ cycle tracks<br>
-&nbsp;&nbsp;&nbsp;&nbsp;[DPAD] ....................... orbit camera&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ARROW KEYS] ................... orbit camera<br>
-&nbsp;&nbsp;&nbsp;&nbsp;[START] ...................... pause/resume&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ENTER] ........................ pause/resume<br>
-&nbsp;&nbsp;&nbsp;&nbsp;[B]/[A] ...................... seek cursor&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[C]/[X] ........................ seek cursor<br>
-&nbsp;&nbsp;&nbsp;&nbsp;[START]+[A] .................. exit&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ESC] .......................... exit<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[dreamcast]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[desktop]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[LT]/[RT] .................... zoom out/in&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[F]/[V] .................... zoom in/out<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[ANALOG STICK] ............... lamp strafe&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[J]/[L] [I]/[K] ............ lamp strafe<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[X]/[Y] ...................... cycle tracks&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[S]/[D] .................... cycle tracks<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[DPAD] ....................... orbit camera&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ARROW KEYS] ............... orbit camera<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[START] ...................... pause/resume&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ENTER] .................... pause/resume<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[B]/[A] ...................... seek cursor&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[C]/[X] .................... seek cursor<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[START]+[A] .................. exit&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ESC] ...................... exit<br>
 &nbsp;&nbsp;&nbsp;&nbsp;[START]+[B] .................. initiate disc swap<br><br>
 </samp>
 
@@ -293,6 +293,7 @@ build.bat <demo> # e.g: build.bat fft-terrain-3d -> bin/desktop/fft-terrain-3d.e
   &nbsp;&nbsp;&nbsp;&nbsp;mkdcdisc .......................... <a href="https://gitlab.com/simulant/mkdcdisc">gitlab.com/simulant/mkdcdisc</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;Shadertoy ......................... <a href="https://www.shadertoy.com/">shadertoy.com</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;Shadertoy media ................... <a href="https://shadertoyunofficial.wordpress.com/2019/07/23/shadertoy-media-files/">Shadertoy media files</a><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;fftw .............................. <a href="https://fftw.org/">fftw.org</a><br> / <a href="https://github.com/fftw/fftw3">github.com/fftw/fftw3</a><br>
 </samp>
 
 
