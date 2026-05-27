@@ -293,7 +293,7 @@ build.bat <demo> # e.g: build.bat fft-terrain-3d -> bin/desktop/fft-terrain-3d.e
   &nbsp;&nbsp;&nbsp;&nbsp;mkdcdisc .......................... <a href="https://gitlab.com/simulant/mkdcdisc">gitlab.com/simulant/mkdcdisc</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;Shadertoy ......................... <a href="https://www.shadertoy.com/">shadertoy.com</a><br>
   &nbsp;&nbsp;&nbsp;&nbsp;Shadertoy media ................... <a href="https://shadertoyunofficial.wordpress.com/2019/07/23/shadertoy-media-files/">Shadertoy media files</a><br>
-  &nbsp;&nbsp;&nbsp;&nbsp;fftw .............................. <a href="https://fftw.org/">fftw.org</a><br> / <a href="https://github.com/fftw/fftw3">github.com/fftw/fftw3</a><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;fftw .............................. <a href="https://fftw.org/">fftw.org</a> / <a href="https://github.com/fftw/fftw3">github.com/fftw/fftw3</a><br>
 </samp>
 
 
