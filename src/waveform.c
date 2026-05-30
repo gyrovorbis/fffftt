@@ -122,7 +122,7 @@ int main(void) {
         // rlEnablePointMode();
         // rlSetPointSize(WAVEFORM_LINE_WIDTH);
         // glDrawArrays(GL_POINTS, 0, ANALYSIS_WAVEFORM_SAMPLE_COUNT);
-        draw_playback_inspection_hud();
+        draw_hud();
         EndDrawing();
     }
 

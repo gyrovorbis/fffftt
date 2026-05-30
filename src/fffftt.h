@@ -821,15 +821,17 @@ static Texture2D build_lane_mask_glow(float* texcoords, int point_count) {
 }
 
 #define ADAPTIVE_ONSET_RATE 0.020f
-#define ADAPTIVE_ONSET_GATE_DEVIATION_SCALE 0.75f
-#define ADAPTIVE_ONSET_RANGE_DEVIATION_SCALE 3.00f
+#define ADAPTIVE_ONSET_GATE_DEVIATION_SCALE 1.00f
+#define ADAPTIVE_ONSET_RANGE_DEVIATION_SCALE 2.00f
 #define GLOBAL_ADAPTIVE_GATE_SMOOTHING_FACTOR 0.08f
 #define GLOBAL_ADAPTIVE_GATE_FLOOR_DEVIATION_SCALE 0.75f
 #define GLOBAL_ADAPTIVE_GATE_CEILING_DEVIATION_SCALE 1.25f
-#define ONSET_DECAY_RATE 0.35f // 0.10f
+#define ONSET_DECAY_RATE 0.65f
 #define ONSET_DELAY_FRAMES 1
 #define ONSET_ENVELOPE_RADIUS 2
 #define LIGHT0_DIFFUSE_MAX 1.5f
+#define LIGHT0_ATTENUATION_SMOOTH 0.20f
+#define LIGHT0_ATTENUATION_FLAT 0.10f
 
 static float onset_gate = 0.0f;
 static float onset_gate_history[ANALYSIS_FFT_HISTORY_FRAME_COUNT] = {0};
@@ -1080,12 +1082,12 @@ static inline void draw_lantern_glow(Vector3 pos) {
     rlEnableDepthTest();
 }
 
-#define CAMERA_FOVY_MIN 0.1f
-#define CAMERA_FOVY_MAX 10.0f
-#define CAMERA_FOVY_VELOCITY 6.0f
-#define CAMERA_ORBIT_VELOCITY 2.0f
-#define CAMERA_PITCH_MIN (-PI / 2.0f + 0.1f)
-#define CAMERA_PITCH_MAX (PI / 2.0f - 0.1f)
+#define CAMERA_FOVY_MIN 0.5f
+#define CAMERA_FOVY_MAX 18.0f
+#define CAMERA_FOVY_VELOCITY 6.25f
+#define CAMERA_ORBIT_VELOCITY 2.25f
+#define CAMERA_PITCH_MIN (-PI / 2.0f + 0.001f)
+#define CAMERA_PITCH_MAX (PI / 2.0f - 0.001f)
 #define BUTTON_DOWN_NAV_INITIAL_DELAY_SECONDS 0.35f
 // TODO: hardmode-> find the exact lane advance cadence for this value, lock it to playback rate a default,
 // then somehow allow for playback snippets to get fed to the device at player controlled update rates...??
@@ -1272,7 +1274,7 @@ static inline void adpcm_save_checkpoint(void) {
 #define CDDA_STATE_CDROM_READY 3
 
 static int cdda_state = CDDA_STATE_NONE;
-static const char* cdda_hud_status_text = "CDDA OFF";
+static const char* cdda_hud_status_text = "NONE";
 
 #define CDROM_RAW_SECTOR_SIZE 2352
 #define CDDA_STEREO_FRAMES_PER_SECTOR 588
@@ -1515,12 +1517,12 @@ static inline void set_audio_track(int track_index) {
 
 static inline void cdda_read_toc(void) {
     if (cdrom_reinit_ex(CDROM_READ_WHOLE_SECTOR, 0, CDROM_RAW_SECTOR_SIZE) != ERR_OK) {
-        cdda_hud_status_text = "CDDA: TRY ANOTHER DISC";
+        cdda_hud_status_text = "PLEASE TRY ANOTHER DISC...";
         return;
     }
     cd_toc_t toc = {0};
     if (cdrom_read_toc(&toc, false) != ERR_OK) {
-        cdda_hud_status_text = "CDDA: TRY ANOTHER DISC";
+        cdda_hud_status_text = "PLEASE TRY ANOTHER DISC...";
         return;
     }
     int first_track = TOC_TRACK(toc.first);
@@ -1540,7 +1542,7 @@ static inline void cdda_read_toc(void) {
         cdda_track_count++;
     }
     if (cdda_track_count == 0) {
-        cdda_hud_status_text = "CDDA: TRY ANOTHER DISC";
+        cdda_hud_status_text = "PLEASE TRY ANOTHER DISC...";
         return;
     }
     cdda_state = CDDA_STATE_CDROM_READY;
@@ -1562,7 +1564,7 @@ static inline void cdda_disc_swap_begin(void) {
     is_paused = true;
     reset_sticky_nav();
     iso_reset();
-    cdda_hud_status_text = "CDDA: REMOVE DISC";
+    cdda_hud_status_text = "PLEASE REMOVE DISC...";
 }
 
 static inline void cdda_state_update(void) {
@@ -1581,7 +1583,7 @@ static inline void cdda_state_update(void) {
     int status = 0;
     int disc_type = 0;
     if (cdrom_get_status(&status, &disc_type) != ERR_OK) {
-        cdda_hud_status_text = "CDDA: TRY ANOTHER DISC";
+        cdda_hud_status_text = "PLEASE TRY ANOTHER DISC...";
         return;
     }
     static int prev_status = -1;
@@ -1606,18 +1608,18 @@ static inline void cdda_state_update(void) {
     if (cdda_state == CDDA_STATE_AWAIT_DISC_REMOVAL) {
         if (status == CD_STATUS_OPEN || status == CD_STATUS_NO_DISC) {
             cdda_state = CDDA_STATE_AWAIT_DISC_INSERT;
-            cdda_hud_status_text = "CDDA: INSERT DISC";
+            cdda_hud_status_text = "PLEASE INSERT NEW DISC...";
             return;
         }
-        cdda_hud_status_text = "CDDA: REMOVE DISC";
+        cdda_hud_status_text = "PLEASE REMOVE DISC...";
         return;
     }
     if (status == CD_STATUS_OPEN || status == CD_STATUS_NO_DISC) {
-        cdda_hud_status_text = "CDDA: INSERT DISC";
+        cdda_hud_status_text = "PLEASE INSERT NEW DISC...";
         return;
     }
     if (status == CD_STATUS_BUSY || status == CD_STATUS_SEEKING || status == CD_STATUS_SCANNING) {
-        cdda_hud_status_text = "CDDA: AWAIT DISC";
+        cdda_hud_status_text = "READING DISC...";
         return;
     }
     if (status == CD_STATUS_PAUSED || status == CD_STATUS_STANDBY) {
@@ -1631,7 +1633,7 @@ static inline void cdda_state_update(void) {
         }
         if (disc_type == CD_CDROM || disc_type == CD_CDROM_XA || disc_type == CD_GDROM) {
             if (cdrom_reinit() != ERR_OK) {
-                cdda_hud_status_text = "CDDA: AWAIT DISC";
+                cdda_hud_status_text = "READING DISC...";
                 return;
             }
             iso_reset();
@@ -1646,10 +1648,10 @@ static inline void cdda_state_update(void) {
             PlayAudioStream(audio_stream);
             return;
         }
-        cdda_hud_status_text = "CDDA: TRY ANOTHER DISC";
+        cdda_hud_status_text = "PLEASE TRY ANOTHER DISC...";
         return;
     }
-    cdda_hud_status_text = "CDDA: AWAIT DISC";
+    cdda_hud_status_text = "READING DISC...";
 }
 #endif // PLATFORM_DREAMCAST
 
@@ -1798,7 +1800,7 @@ static inline void draw_hud_text(const char* s, float x, float y, Color c) {
     }
 }
 
-static void draw_playback_inspection_hud(void) {
+static void draw_hud(void) {
     int cursor = wave_cursor;
     int cursor_ms = SAMPLE_CURSOR_TO_MS(cursor);
     Color hud_color = is_paused ? MARINER : NEON_CARROT;
@@ -1836,7 +1838,9 @@ static void draw_playback_inspection_hud(void) {
                    0.0f,
                    MARINER);
     } else if (cdda_state != CDDA_STATE_NONE) {
-        DrawTextEx(font, cdda_hud_status_text, (Vector2){7.0f + 20.0f, 25.0f + FONT_SIZE}, FONT_SIZE, 0.0f, MARINER);
+        Vector2 cdda_hud_text_half_size = Vector2Scale(MeasureTextEx(font, cdda_hud_status_text, FONT_SIZE * 2.0f, 0.0f), 0.5f);
+        Vector2 cdda_hud_pos = Vector2Subtract((Vector2){(float)SCREEN_WIDTH * 0.5f, (float)SCREEN_HEIGHT * (1.0f / 7.0f)}, cdda_hud_text_half_size);
+        DrawTextEx(font, cdda_hud_status_text, cdda_hud_pos, FONT_SIZE * 2.0f, 0.0f, fffftt_wave_cursor_blink_color());
     } else {
         DrawTextEx(font,
                    TextFormat("TRACK [%d/%d]: %s", audio_track_index, AUDIO_TRACK_COUNT - 1, AUDIO_TRACK_PATH(audio_track_index)),

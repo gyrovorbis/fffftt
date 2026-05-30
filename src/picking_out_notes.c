@@ -147,7 +147,7 @@ int main(void) {
         BeginDrawing();
         ClearBackground(BLACK);
         picking_out_the_notes(&fft_data);
-        draw_playback_inspection_hud();
+        draw_hud();
         EndDrawing();
     }
 

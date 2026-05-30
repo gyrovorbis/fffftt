@@ -153,6 +153,7 @@ int main(void) {
         glLightfv(GL_LIGHT0, GL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
         glLightfv(GL_LIGHT0, GL_DIFFUSE, light0_diffuse);
         glLightfv(GL_LIGHT0, GL_POSITION, (const GLfloat[]){light0_pos.x, light0_pos.y, light0_pos.z, 1.0f});
+        glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, LIGHT0_ATTENUATION_SMOOTH);
         DrawModelEx(model_a, MIDDLE, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE);
         glDisable(GL_LIGHTING);
         draw_lantern(light0_pos);
@@ -173,8 +174,9 @@ int main(void) {
         glShadeModel(GL_FLAT);
         glLightModelfv(GL_LIGHT_MODEL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
         glLightfv(GL_LIGHT0, GL_AMBIENT, (const GLfloat[]){0.0f, 0.0f, 0.0f, 1.0f});
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, (const GLfloat[]){1.0f, 1.0f, 1.0f, 1.0f});
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, (const GLfloat[]){LIGHT0_DIFFUSE_MAX, LIGHT0_DIFFUSE_MAX, LIGHT0_DIFFUSE_MAX, 1.0f});
         glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, (const GLfloat[]){0.0f, 0.0f, 0.0f, 0.0f});
+        glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, LIGHT0_ATTENUATION_FLAT);
         DrawModelEx(flat_model, TOP, Y_AXIS, 0.0f, DEFAULT_SCALE, WHITE); // TODO: rough on 64 byte Vertex GLdc
         glShadeModel(GL_SMOOTH);
         glDisable(GL_LIGHTING);
@@ -192,7 +194,7 @@ int main(void) {
         model_a.meshes[0].colors = saved_colors;
 
         EndMode3D();
-        draw_playback_inspection_hud();
+        draw_hud();
         EndDrawing();
     }
 

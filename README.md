@@ -299,6 +299,7 @@ build.bat <demo> # e.g: build.bat fft-terrain-3d -> bin/desktop/fft-terrain-3d.e
 
 <samp>[todo]<br>
   &nbsp;&nbsp;&nbsp;&nbsp;add polygon mode for QUAD wire frame in GLdc<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;prove analysis backends via librosa/essentia, see <a href="mathworks/README.txt">mathworks/README.txt</a><br>
 </samp>
 
 

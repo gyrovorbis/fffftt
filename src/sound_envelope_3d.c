@@ -96,7 +96,7 @@ int main(void) {
         }
 
         EndMode3D();
-        draw_playback_inspection_hud();
+        draw_hud();
         EndDrawing();
     }
 
