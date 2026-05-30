@@ -265,8 +265,8 @@ make dc-waveform-terrain-3d       # run: ./bin/dc/waveform-terrain-3d       # el
 make desktop-<demo> # e.g.: make desktop-fft-terrain-3d -> ./bin/desktop/fft-terrain-3d
 
 #[windows]
-build.bat # builds all desktop demos
-build.bat <demo> # e.g: build.bat fft-terrain-3d -> bin/desktop/fft-terrain-3d.exe
+./build.bat # builds all desktop demos
+./build.bat <demo> # e.g: ./build.bat fft-terrain-3d -> bin/desktop/fft-terrain-3d.exe
 ```
 
 
