@@ -194,7 +194,7 @@ int main(void) {
     fill_mesh_colors(high_band_colors, HIGH_BAND_POINT_COUNT);
 
     update_fft_bands_terrain_meshes();
-    //SetTargetFPS(60);
+    SetTargetFPS(60);
 
     while (!WindowShouldClose()) {
         if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) && IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
@@ -282,9 +282,9 @@ int main(void) {
         high_band_model.meshes[0].colors = NULL;
         high_band_model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture.id = high_band_white_noise_texture.id;
         mid_band_model.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture.id = mid_band_white_noise_texture.id;
-         spectral_flatness_glitter_tint.a = (unsigned char)(spectral_flatness_glitter_alpha * (float)DRAW_COLOR_CHANNEL_MAX);
+        spectral_flatness_glitter_tint.a = (unsigned char)(spectral_flatness_glitter_alpha * (float)DRAW_COLOR_CHANNEL_MAX);
         if (spectral_flatness_glitter_tint.a != 0) {
-            if(spectral_flatness_glitter_tint.a > 180)
+            if (spectral_flatness_glitter_tint.a > 180)
                 rlDisableColorBlend();
             rlEnablePointMode();
             rlDisableDepthTest();
@@ -353,7 +353,7 @@ build_band_terrain(float* lane_point_values, int point_count, const float* level
 
     if (adaptive_peak) {
         *adaptive_peak = FMAXF(*adaptive_peak * ADAPTIVE_PEAK_DECAY, band_peak);
-        if(*adaptive_peak > 0.0f) {
+        if (*adaptive_peak > 0.0f) {
             float inv_peak = INVF(*adaptive_peak);
             float inv_range_db = 1.0f / ADAPTIVE_DYNAMIC_RANGE_DB;
             for (int i = 0; i < point_count; i++) {

@@ -5,6 +5,7 @@
 #include "raymath.h"
 #include "rlgl.h"
 #include <math.h>
+#include <stdalign.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -23,10 +24,12 @@
 #define PI_F SHZ_F_PI
 #define SINF(x) shz_sinf((x))
 #define COSF(x) shz_cosf((x))
-#define SINCOSF(x, ss, cc) do { \
-    shz_sincos_t tmp_ = shz_sincosf((x)); \
-    ss = tmp_.sin; cc = tmp_.cos; \
-} while(0)
+#define SINCOSF(x, ss, cc)                                                                                                                                     \
+    do {                                                                                                                                                       \
+        shz_sincos_t tmp_ = shz_sincosf((x));                                                                                                                  \
+        ss = tmp_.sin;                                                                                                                                         \
+        cc = tmp_.cos;                                                                                                                                         \
+    } while (0)
 #define TANF(x) shz_tanf((x))
 #define SQRTF(x) shz_sqrtf((x))
 #define INVSQRTF(x) shz_inv_sqrtf((x))
@@ -50,6 +53,13 @@
 #define MEMCPY(dst, src, size) shz_memcpy((dst), (src), (size))
 #define MEMCPY4(dst, src, size) shz_memcpy((dst), (src), (size))
 #define MEMMOVE(dst, src, size) shz_memmove((dst), (src), (size))
+
+static inline size_t align32_size(size_t n) {
+    const size_t alignment = 32;
+    return ((n + alignment - 1) / alignment) * alignment;
+}
+
+#define ALIGNED_ALLOC(n) aligned_alloc(32, align32_size((n)))
 #define CLAMP(x, min, max) shz_clampf((x), (min), (max))
 #define LERP(a, b, t) shz_lerpf((a), (b), (t))
 #define WRAP(pos, size) wrap((pos), (size))
@@ -74,19 +84,26 @@ static int src_file = 0;
 #define PI_F PI
 #define SINF(x) sinf((x))
 #define COSF(x) cosf((x))
-#define SINCOSF(x, s, c) do { \
-    s = sinf(x); c = cosf(x); \
-} while(0)
+#define SINCOSF(x, s, c)                                                                                                                                       \
+    do {                                                                                                                                                       \
+        s = sinf(x);                                                                                                                                           \
+        c = cosf(x);                                                                                                                                           \
+    } while (0)
 #define TANF(x) tanf((x))
 #define SQRTF(x) sqrtf((x))
+#define INVSQRTF(x) (1.0f / sqrtf((x)))
 #define ATAN2F(y, x) atan2f((y), (x))
 #define ACOSF(x) acosf((x))
 #define POWF(x, y) powf((x), (y))
 #define EXPF(x) expf((x))
-#define EXP2F(x) pow(2.0f, x)
+#define EXP2(x) exp2f((x))
 #define FLOORF(x) floorf((x))
 #define CEILF(x) ceilf((x))
 #define FMODF(x, y) fmodf((x), (y))
+#define INVF(x) (1.0f / (x))
+#define ABSINVF(x) (1.0f / (x))
+#define DIVF(n, d) ((n) / (d))
+#define ABSDIVF(n, d) ((n) / (d))
 #define LOGF(x) logf((x))
 #define FMAXF(x, y) fmaxf((x), (y))
 #define FMINF(x, y) fminf((x), (y))
@@ -95,6 +112,7 @@ static int src_file = 0;
 #define MEMCPY(dst, src, size) memcpy((dst), (src), (size))
 #define MEMCPY4(dst, src, size) memcpy((dst), (src), (size))
 #define MEMMOVE(dst, src, size) memmove((dst), (src), (size))
+#define ALIGNED_ALLOC(n) RL_CALLOC((n), 1)
 #define CLAMP(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 #define LERP(a, b, t) ((a) + ((b) - (a)) * (t))
 #define WRAP(pos, size) wrap((pos), (size))
@@ -134,11 +152,6 @@ static inline int file_total(FILE* file) {
 
 static FILE* src_file = NULL;
 #endif
-
-#define ALIGNED_ALLOC(n) ({ \
-    void* ptr = aligned_alloc(32, n); \
-    ptr; \
-})
 
 #define MAXI(x, y) ((x) > (y) ? (x) : (y))
 #define MINI(x, y) ((x) < (y) ? (x) : (y))
@@ -497,30 +510,34 @@ static inline void update_envelope_mesh_vertices_isometric(Vector3* vertices) {
     // col0-col2 are fully constant — loaded once outside both loops via shz_xmtrx_load_4x4.
     // No scalar adds in inner loop; only shz_xmtrx_write_col(3,...) per outer iteration.
     alignas(32) static const shz_mat4x4_t iso_base = {.col = {
-        { ISOMETRIC_ZOOM, -0.5f * ISOMETRIC_ZOOM, ISOMETRIC_ZOOM, -0.5f * ISOMETRIC_ZOOM },
-        { 0.0f, AMPLITUDE_Y_SCALE * ISOMETRIC_ZOOM, 0.0f, 0.0f },
-        { 0.0f, 0.0f, 0.0f, AMPLITUDE_Y_SCALE * ISOMETRIC_ZOOM },
-        { 0.0f, 0.0f, ISOMETRIC_ZOOM, -0.5f * ISOMETRIC_ZOOM },
-    }};
+                                                          {ISOMETRIC_ZOOM, -0.5f * ISOMETRIC_ZOOM, ISOMETRIC_ZOOM, -0.5f * ISOMETRIC_ZOOM},
+                                                          {0.0f, AMPLITUDE_Y_SCALE * ISOMETRIC_ZOOM, 0.0f, 0.0f},
+                                                          {0.0f, 0.0f, 0.0f, AMPLITUDE_Y_SCALE * ISOMETRIC_ZOOM},
+                                                          {0.0f, 0.0f, ISOMETRIC_ZOOM, -0.5f * ISOMETRIC_ZOOM},
+                                                      }};
     shz_xmtrx_load_4x4(&iso_base);
     for (int i = 0; i < LANE_COUNT; i++) {
         float lane_offset = (float)i * ISOMETRIC_LANE_SPACING;
-        float tx = 0.5f * (float)SCREEN_WIDTH  - (lane_offset + ISOMETRIC_GRID_CENTER_X) * ISOMETRIC_ZOOM;
+        float tx = 0.5f * (float)SCREEN_WIDTH - (lane_offset + ISOMETRIC_GRID_CENTER_X) * ISOMETRIC_ZOOM;
         float ty = 0.5f * (float)SCREEN_HEIGHT - (0.5f * lane_offset - ISOMETRIC_GRID_CENTER_Y) * ISOMETRIC_ZOOM;
         shz_xmtrx_write_col(3, shz_vec4_init(tx, ty, tx + ISOMETRIC_ZOOM, ty - 0.5f * ISOMETRIC_ZOOM));
         int j = 0;
         for (; j < LANE_POINT_COUNT - 1; j += 2) {
             int k0 = i * LANE_POINT_COUNT + j;
-            shz_vec4_t r = shz_xmtrx_transform_vec4(
-                shz_vec4_init((float)j, lane_point_values[i][j], lane_point_values[i][j + 1], 1.0f));
-            vertices[k0].x = r.x;      vertices[k0].y = r.y;      vertices[k0].z = 0.0f;
-            vertices[k0 + 1].x = r.z;  vertices[k0 + 1].y = r.w;  vertices[k0 + 1].z = 0.0f;
+            shz_vec4_t r = shz_xmtrx_transform_vec4(shz_vec4_init((float)j, lane_point_values[i][j], lane_point_values[i][j + 1], 1.0f));
+            vertices[k0].x = r.x;
+            vertices[k0].y = r.y;
+            vertices[k0].z = 0.0f;
+            vertices[k0 + 1].x = r.z;
+            vertices[k0 + 1].y = r.w;
+            vertices[k0 + 1].z = 0.0f;
         }
         if (j < LANE_POINT_COUNT) {
             int k = i * LANE_POINT_COUNT + j;
-            shz_vec4_t r = shz_xmtrx_transform_vec4(
-                shz_vec4_init((float)j, lane_point_values[i][j], 0.0f, 1.0f));
-            vertices[k].x = r.x;  vertices[k].y = r.y;  vertices[k].z = 0.0f;
+            shz_vec4_t r = shz_xmtrx_transform_vec4(shz_vec4_init((float)j, lane_point_values[i][j], 0.0f, 1.0f));
+            vertices[k].x = r.x;
+            vertices[k].y = r.y;
+            vertices[k].z = 0.0f;
         }
     }
 #else
@@ -543,30 +560,33 @@ static inline void update_envelope_mesh_vertices(Vector3* vertices) {
     // Two adjacent points per FTRV: v = [j, amp_j, amp_{j+1}, 1]
     // r = [x_j, y_j, x_{j+1}, y_{j+1}]; z is scalar (constant per lane, stored separately).
     // M is fully compile-time constant — loaded once, no per-lane update needed at all.
-    alignas(32) static const shz_mat4x4_t env_base = { .col = {
-        { LINE_LENGTH_SCALE / (float)(LANE_POINT_COUNT - 1), 0.0f,
-          LINE_LENGTH_SCALE / (float)(LANE_POINT_COUNT - 1), 0.0f },
-        { 0.0f, AMPLITUDE_Y_SCALE, 0.0f, 0.0f },
-        { 0.0f, 0.0f, 0.0f, AMPLITUDE_Y_SCALE },
-        { -HALF_SPAN * LINE_LENGTH_SCALE, 0.0f,
-          LINE_LENGTH_SCALE / (float)(LANE_POINT_COUNT - 1) - HALF_SPAN * LINE_LENGTH_SCALE, 0.0f },
-    }};
+    alignas(32) static const shz_mat4x4_t env_base = {
+        .col = {
+            {LINE_LENGTH_SCALE / (float)(LANE_POINT_COUNT - 1), 0.0f, LINE_LENGTH_SCALE / (float)(LANE_POINT_COUNT - 1), 0.0f},
+            {0.0f, AMPLITUDE_Y_SCALE, 0.0f, 0.0f},
+            {0.0f, 0.0f, 0.0f, AMPLITUDE_Y_SCALE},
+            {-HALF_SPAN * LINE_LENGTH_SCALE, 0.0f, LINE_LENGTH_SCALE / (float)(LANE_POINT_COUNT - 1) - HALF_SPAN * LINE_LENGTH_SCALE, 0.0f},
+        }};
     shz_xmtrx_load_4x4(&env_base);
     for (int i = 0; i < LANE_COUNT; i++) {
         float z = HALF_SPAN - (float)i * (1.0f / (float)(LANE_COUNT - 1));
         int j = 0;
         for (; j < LANE_POINT_COUNT - 1; j += 2) {
             int k0 = i * LANE_POINT_COUNT + j;
-            shz_vec4_t r = shz_xmtrx_transform_vec4(
-                shz_vec4_init((float)j, lane_point_values[i][j], lane_point_values[i][j + 1], 1.0f));
-            vertices[k0].x = r.x;      vertices[k0].y = r.y;      vertices[k0].z = z;
-            vertices[k0 + 1].x = r.z;  vertices[k0 + 1].y = r.w;  vertices[k0 + 1].z = z;
+            shz_vec4_t r = shz_xmtrx_transform_vec4(shz_vec4_init((float)j, lane_point_values[i][j], lane_point_values[i][j + 1], 1.0f));
+            vertices[k0].x = r.x;
+            vertices[k0].y = r.y;
+            vertices[k0].z = z;
+            vertices[k0 + 1].x = r.z;
+            vertices[k0 + 1].y = r.w;
+            vertices[k0 + 1].z = z;
         }
         if (j < LANE_POINT_COUNT) {
             int k = i * LANE_POINT_COUNT + j;
-            shz_vec4_t r = shz_xmtrx_transform_vec4(
-                shz_vec4_init((float)j, lane_point_values[i][j], 0.0f, 1.0f));
-            vertices[k].x = r.x;  vertices[k].y = r.y;  vertices[k].z = z;
+            shz_vec4_t r = shz_xmtrx_transform_vec4(shz_vec4_init((float)j, lane_point_values[i][j], 0.0f, 1.0f));
+            vertices[k].x = r.x;
+            vertices[k].y = r.y;
+            vertices[k].z = z;
         }
     }
 #else
@@ -599,10 +619,10 @@ static inline void fill_mesh_colors(Color* colors, int point_count) {
     for (int i = 0; i < LANE_COUNT; i++) {
         float v = (float)i / (float)(LANE_COUNT - 1);
         float omv = 1.0f - v;
-        float r_start = omv * MAGENTA.r + v * RED.r, r_step = (omv * BLUE.r  + v * YELLOW.r) - r_start;
-        float g_start = omv * MAGENTA.g + v * RED.g, g_step = (omv * BLUE.g  + v * YELLOW.g) - g_start;
-        float b_start = omv * MAGENTA.b + v * RED.b, b_step = (omv * BLUE.b  + v * YELLOW.b) - b_start;
-        float inv_point_count = ABSINVF((float)(point_count) - 1);
+        float r_start = omv * MAGENTA.r + v * RED.r, r_step = (omv * BLUE.r + v * YELLOW.r) - r_start;
+        float g_start = omv * MAGENTA.g + v * RED.g, g_step = (omv * BLUE.g + v * YELLOW.g) - g_start;
+        float b_start = omv * MAGENTA.b + v * RED.b, b_step = (omv * BLUE.b + v * YELLOW.b) - b_start;
+        float inv_point_count = ABSINVF((float)(point_count)-1);
         for (int j = 0; j < point_count; j++) {
             float u = (float)j * inv_point_count;
             colors[i * point_count + j] = (Color){
@@ -804,12 +824,13 @@ static void update_mesh_normals_flat(float* normals, const float* vertices, int 
         Vector3 e2 = Vector3Subtract(p2, p0);
         Vector3 normal = Vector3CrossProduct(e1, e2);
         float mag_sqr = normal.x * normal.x + normal.y * normal.y + normal.z * normal.z;
-        if(mag_sqr != 0.0f) {
+        if (mag_sqr != 0.0f) {
             float inv_mag = INVSQRTF(mag_sqr);
             normal.x *= inv_mag;
             normal.y *= inv_mag;
             normal.z *= inv_mag;
-        } else normal.x = normal.y = normal.z = 0.0f;
+        } else
+            normal.x = normal.y = normal.z = 0.0f;
 
         for (int j = 0; j < 3; j++) {
             int normal_vertex = tri_vertex + j * 3;
@@ -1078,12 +1099,13 @@ static inline void update_light_camera_strafe(const Camera3D* camera, Vector3 re
     Vector3 cam_forward = Vector3Normalize(Vector3Subtract(camera->target, camera->position));
     Vector3 cam_right = Vector3CrossProduct(cam_forward, camera->up);
     float mag_sqr = cam_right.x * cam_right.x + cam_right.y * cam_right.y + cam_right.z * cam_right.z;
-    if(mag_sqr != 0.0f) {
+    if (mag_sqr != 0.0f) {
         float inv_mag = INVSQRTF(mag_sqr);
         cam_right.x *= inv_mag;
         cam_right.y *= inv_mag;
         cam_right.z *= inv_mag;
-    } else cam_right.x = cam_right.y = cam_right.z = 0.0f;
+    } else
+        cam_right.x = cam_right.y = cam_right.z = 0.0f;
     Vector3 cam_up = Vector3CrossProduct(cam_right, cam_forward);
     Vector3 strafe_pos_offset =
         Vector3Add(Vector3Scale(cam_right, strafe_axis_x * LIGHT_STRAFE_RANGE), Vector3Scale(cam_up, -strafe_axis_y * LIGHT_STRAFE_RANGE));
@@ -2157,7 +2179,7 @@ static void build_chroma_fields(unsigned char* lane_chroma_id,
             float chroma_delta = chroma_pos - filter_chroma;
             chroma_delta = FMODF(chroma_delta + 6.0f + 120.0f, 12.0f) - 6.0f; // librosa: project wrapped chroma distance into [-6, +6]
             float chroma_filter_weight = EXPF(-0.5f * POWF(ABSDIVF(2.0f * chroma_delta, chroma_width), 2.0f)); // librosa Gaussian bump
-            chroma_filter_weight *= filter_l2_inv_norm;                                                      // librosa.filters.chroma(..., norm=2, axis=0)
+            chroma_filter_weight *= filter_l2_inv_norm;                                                        // librosa.filters.chroma(..., norm=2, axis=0)
             chroma_sum[j] += power * chroma_filter_weight * octave_weight; // librosa.feature.chroma_stft: raw_chroma = chromafb @ S
         }
     }
@@ -2226,7 +2248,7 @@ static inline uint16_t jenkins_1997_white_noise_rgb565(uint32_t x, uint32_t y, u
 
 //TODO: bake offline ofc, and would be good chance to study pvr and vq stuff too again, just to be thorough/more practice
 static Texture2D build_white_noise_texture(int w, int h) {
-    unsigned short pixels[w * h];
+    unsigned short* pixels = ALIGNED_ALLOC(sizeof(unsigned short) * (size_t)w * (size_t)h);
     Image image = {
         .data = pixels,
         .width = w,
@@ -2240,6 +2262,7 @@ static Texture2D build_white_noise_texture(int w, int h) {
         }
     }
     Texture2D texture = LoadTextureFromImage(image);
+    RL_FREE(pixels);
     return texture;
 }
 
@@ -2280,7 +2303,7 @@ static void fill_white_noise_mask_texcoords(int w, int h, float* texcoords, int 
 }
 
 static Texture2D build_white_noise_mask(int w, int h, float* texcoords, int point_count, int texels_per_quad) {
-    unsigned short pixels[w * h];
+    unsigned short* pixels = ALIGNED_ALLOC(sizeof(unsigned short) * (size_t)w * (size_t)h);
     Image image = {
         .data = pixels,
         .width = w,
@@ -2295,6 +2318,7 @@ static Texture2D build_white_noise_mask(int w, int h, float* texcoords, int poin
         }
     }
     Texture2D texture = LoadTextureFromImage(image);
+    RL_FREE(pixels);
     return texture;
 }
 
